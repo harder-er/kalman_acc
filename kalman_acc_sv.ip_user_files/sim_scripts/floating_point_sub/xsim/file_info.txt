@@ -1,0 +1,2 @@
+floating_point_sub.v,verilog,xil_defaultlib,../../../../kalman_acc_sv.gen/sources_1/ip/floating_point_sub/sim/floating_point_sub.v,
+glbl.v,Verilog,xil_defaultlib,glbl.v

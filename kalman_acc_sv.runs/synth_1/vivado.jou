@@ -1,0 +1,12 @@
+#-----------------------------------------------------------
+# Vivado v2020.1 (64-bit)
+# SW Build 2902540 on Wed May 27 19:54:49 MDT 2020
+# IP Build 2902112 on Wed May 27 22:43:36 MDT 2020
+# Start of session at: Mon Mar 10 15:47:23 2025
+# Process ID: 14140
+# Current directory: D:/Main_Files/postgraduate/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.runs/synth_1
+# Command line: vivado.exe -log KalmanFilterTop.vds -product Vivado -mode batch -messageDb vivado.pb -notrace -source KalmanFilterTop.tcl
+# Log file: D:/Main_Files/postgraduate/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.runs/synth_1/KalmanFilterTop.vds
+# Journal file: D:/Main_Files/postgraduate/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.runs/synth_1\vivado.jou
+#-----------------------------------------------------------
+source KalmanFilterTop.tcl -notrace
