@@ -20,19 +20,19 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module MatrixTransBridge #(
-    parameter ROWS = 8,        // ¾ØÕóĞĞÊı
-    parameter COLS = 8,        // ¾ØÕóÁĞÊı
-    parameter DATA_WIDTH = 64  // Êı¾İÎ»¿í£¨ÍøÒ³6ÖĞ8x8·½°¸À©Õ¹£©
+    parameter ROWS = 12,        // çŸ©é˜µè¡Œæ•°
+    parameter COLS = 12,        // çŸ©é˜µåˆ—æ•°
+    parameter DATA_WIDTH = 64  // æ•°æ®ä½å®½ï¼ˆç½‘é¡µ6ä¸­8x8æ–¹æ¡ˆæ‰©å±•ï¼‰
 )(
-    input  logic                     clk,       // ÏµÍ³Ê±ÖÓ£¨ÍøÒ³8Ê±Ğò¿ØÖÆ£©
-    input  logic                     rst_n,     // Òì²½¸´Î»
-    input  logic [DATA_WIDTH-1:0]    mat_in [0:ROWS-1][0:COLS-1], // ÊäÈë¾ØÕó
-    output logic [DATA_WIDTH-1:0]    mat_org [0:ROWS-1][0:COLS-1],// Ô­¾ØÕóÊä³ö
-    output logic [DATA_WIDTH-1:0]    mat_trans [0:COLS-1][0:ROWS-1],// ×ªÖÃ¾ØÕó
-    output logic                     valid_out  // Êä³öÓĞĞ§±êÖ¾
+    input  logic                     clk,       // ç³»ç»Ÿæ—¶é’Ÿï¼ˆç½‘é¡µ8æ—¶åºæ§åˆ¶ï¼‰
+    input  logic                     rst_n,     // å¼‚æ­¥å¤ä½
+    input  logic [DATA_WIDTH-1:0]    mat_in [0:ROWS-1][0:COLS-1], // è¾“å…¥çŸ©é˜µ
+    output logic [DATA_WIDTH-1:0]    mat_org [0:ROWS-1][0:COLS-1],// åŸçŸ©é˜µè¾“å‡º
+    output logic [DATA_WIDTH-1:0]    mat_trans [0:COLS-1][0:ROWS-1],// è½¬ç½®çŸ©é˜µ
+    output logic                     valid_out  // è¾“å‡ºæœ‰æ•ˆæ ‡å¿—
 );
 
-// ¨€¨€¨€¨€ ÊäÈë¼Ä´æÆ÷×é£¨ÍøÒ³7ÒÆÎ»¼Ä´æÆ÷·½°¸¸Ä½ø£©
+// â–ˆâ–ˆâ–ˆâ–ˆ è¾“å…¥å¯„å­˜å™¨ç»„ï¼ˆç½‘é¡µ7ç§»ä½å¯„å­˜å™¨æ–¹æ¡ˆæ”¹è¿›ï¼‰
 logic [DATA_WIDTH-1:0] input_buffer [0:ROWS-1][0:COLS-1];
 
 always_ff @(posedge clk or negedge rst_n) begin
@@ -40,24 +40,24 @@ always_ff @(posedge clk or negedge rst_n) begin
         foreach(input_buffer[i,j]) 
             input_buffer[i][j] <= '0;
     end else begin
-        input_buffer <= mat_in;  // Í¬²½Ëø´æÊäÈë£¨ÍøÒ³8¿ØÖÆÂß¼­£©
+        input_buffer <= mat_in;  // åŒæ­¥é”å­˜è¾“å…¥ï¼ˆç½‘é¡µ8æ§åˆ¶é€»è¾‘ï¼‰
     end
 end
 
-// ¨€¨€¨€¨€ ×ªÖÃÉú³ÉÂß¼­£¨ÍøÒ³6Ñ­»··½°¸ÓÅ»¯£©
+// â–ˆâ–ˆâ–ˆâ–ˆ è½¬ç½®ç”Ÿæˆé€»è¾‘ï¼ˆç½‘é¡µ6å¾ªç¯æ–¹æ¡ˆä¼˜åŒ–ï¼‰
 generate
     for(genvar i=0; i<ROWS; i++) begin : row_gen
         for(genvar j=0; j<COLS; j++) begin : col_gen
-            // Ô­¾ØÕóÖ±Í¨Êä³ö£¨ÍøÒ³1¾ØÕó²Ù×÷Ô­Àí£©
+            // åŸçŸ©é˜µç›´é€šè¾“å‡ºï¼ˆç½‘é¡µ1çŸ©é˜µæ“ä½œåŸç†ï¼‰
             assign mat_org[i][j] = input_buffer[i][j];
             
-            // ×ªÖÃ¾ØÕóÉú³É£¨ÍøÒ³6×ªÖÃÂß¼­ºËĞÄ£©
+            // è½¬ç½®çŸ©é˜µç”Ÿæˆï¼ˆç½‘é¡µ6è½¬ç½®é€»è¾‘æ ¸å¿ƒï¼‰
             assign mat_trans[j][i] = input_buffer[i][j]; 
         end
     end
 endgenerate
 
-// ¨€¨€¨€¨€ Ê±Ğò¿ØÖÆµ¥Ôª£¨ÍøÒ³8×´Ì¬»ú¸Ä½ø£©
+// â–ˆâ–ˆâ–ˆâ–ˆ æ—¶åºæ§åˆ¶å•å…ƒï¼ˆç½‘é¡µ8çŠ¶æ€æœºæ”¹è¿›ï¼‰
 typedef enum {IDLE, PROCESS} state_t;
 state_t curr_state;
 
@@ -69,11 +69,11 @@ always_ff @(posedge clk or negedge rst_n) begin
         case(curr_state)
             IDLE: begin
                 valid_out <= 1'b0;
-                if(&mat_in[ROWS-1][COLS-1]) // ¼ì²âÊäÈëÍê³É£¨ÍøÒ³8ÅäÖÃ¼Ä´æÆ÷Ë¼Ïë£©
+                if(&mat_in[ROWS-1][COLS-1]) // æ£€æµ‹è¾“å…¥å®Œæˆï¼ˆç½‘é¡µ8é…ç½®å¯„å­˜å™¨æ€æƒ³ï¼‰
                     curr_state <= PROCESS;
             end
             PROCESS: begin
-                valid_out <= 1'b1;          // Êä³öÓĞĞ§ĞÅºÅ
+                valid_out <= 1'b1;          // è¾“å‡ºæœ‰æ•ˆä¿¡å·
                 curr_state <= IDLE;
             end
         endcase

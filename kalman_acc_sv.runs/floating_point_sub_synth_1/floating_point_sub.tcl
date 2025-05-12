@@ -87,7 +87,7 @@ set_property ip_output_repo d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc
 set_property ip_cache_permissions {read write} [current_project]
 OPTRACE "Creating in-memory project" END { }
 OPTRACE "Adding files" START { }
-read_ip -quiet d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_sub/floating_point_sub.xci
+read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_sub/floating_point_sub.xci
 set_property used_in_implementation false [get_files -all d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.gen/sources_1/ip/floating_point_sub/floating_point_sub_ooc.xdc]
 
 OPTRACE "Adding files" END { }

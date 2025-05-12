@@ -3,7 +3,7 @@
 # 
 # Vivado(TM)
 # runme.sh: a Vivado-generated Runs Script for UNIX
-# Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+# Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 # 
 
 echo "This script was generated under a different operating system."
@@ -11,9 +11,9 @@ echo "Please update the PATH and LD_LIBRARY_PATH variables below, before executi
 exit
 
 if [ -z "$PATH" ]; then
-  PATH=F:/Xilinx/Vitis/2020.1/bin;F:/Xilinx/Vivado/2020.1/ids_lite/ISE/bin/nt64;F:/Xilinx/Vivado/2020.1/ids_lite/ISE/lib/nt64:F:/Xilinx/Vivado/2020.1/bin
+  PATH=D:/Xilinx/Vitis/2021.2/bin;D:/Xilinx/Vivado/2021.2/ids_lite/ISE/bin/nt64;D:/Xilinx/Vivado/2021.2/ids_lite/ISE/lib/nt64:D:/Xilinx/Vivado/2021.2/bin
 else
-  PATH=F:/Xilinx/Vitis/2020.1/bin;F:/Xilinx/Vivado/2020.1/ids_lite/ISE/bin/nt64;F:/Xilinx/Vivado/2020.1/ids_lite/ISE/lib/nt64:F:/Xilinx/Vivado/2020.1/bin:$PATH
+  PATH=D:/Xilinx/Vitis/2021.2/bin;D:/Xilinx/Vivado/2021.2/ids_lite/ISE/bin/nt64;D:/Xilinx/Vivado/2021.2/ids_lite/ISE/lib/nt64:D:/Xilinx/Vivado/2021.2/bin:$PATH
 fi
 export PATH
 
@@ -24,7 +24,7 @@ else
 fi
 export LD_LIBRARY_PATH
 
-HD_PWD='D:/Main_Files/postgraduate/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.runs/synth_1'
+HD_PWD='D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.runs/synth_1'
 cd "$HD_PWD"
 
 HD_LOG=runme.log

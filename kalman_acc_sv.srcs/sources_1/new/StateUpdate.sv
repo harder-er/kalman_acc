@@ -23,35 +23,47 @@ module StateUpdate (
     input  logic         clk,
     input  logic         rst_n,
     
-    // MIBus½Ó¿Ú£¨Ö÷¿ØÖÆ×ÜÏß£©
-    input  logic [127:0] mibus_cmd,     // ¿ØÖÆÖ¸Áî×ÜÏß
-    output logic [63:0]  mibus_status,  // ×´Ì¬·´À¡
-    
-    // OMBUsÍ¨µÀ£¨12x64Î»Êı¾İÊäÈë£©
-    input  logic [63:0]  ombus_ch [11:0], // Í¨µÀ0-11
-    
-    // ×´Ì¬×ªÒÆ¾ØÕóÊäÈë
-    input  logic [63:0]  F [11:0][11:0], // 12x64¾ØÕó
-    
-    // FIFOÊä³ö½Ó¿Ú
-    output logic [63:0]  X_k1k [11:0],   // X_{k+1,k}Êä³ö
-    output logic         fifo_valid      // Êı¾İÓĞĞ§±êÖ¾
+    // çŠ¶æ€è½¬ç§»çŸ©é˜µè¾“å…¥
+    input  logic [63:0]  F [11:0][11:0], // 
+    input  logic [63:0]  X_kk [11:0], // 
+    // FIFOè¾“å‡ºæ¥å£
+    output logic [63:0]  X_k1k [11:0],   // X_{k+1,k}è¾“å‡º
+    output logic         fifo_valid      // æ•°æ®æœ‰æ•ˆæ ‡å¿—
 );
+logic [64-1:0] matrix_out [0:12-1][0:12-1];
+generate//å¡«å……ä¸º12x12çŸ©é˜µ
+    for (genvar i = 0; i < 12; i++) begin : row_gen
+        for (genvar j = 0; j < 12; j++) begin : col_gen
+            always_ff @(posedge clk or negedge rst_n) begin
+                if (!rst_n) begin
+                    matrix_out[i][j] <= 64'h0; // å¤ä½æ—¶æ¸…é›¶
+                end else  begin
+                    matrix_out[i][j] <= (j == 0) ? X_kk[i] : 64'h0;
+                end
+            end
+        end
+    end
+endgenerate
 
-// ÄÚ²¿ĞÅºÅÉùÃ÷
-logic [63:0] X_kk [11:0];        // X_{k,k}¼Ä´æÆ÷×é
-logic [63:0] F_buf [11:0][11:0]; // ¾ØÕó»º´æ
-logic [63:0] partial_sum [11:0]; // ²¢ĞĞ¼Ó·¨Æ÷
-
-// MIBusÖ¸Áî½âÎö
-logic [3:0]  cmd_opcode;         // Ö¸Áî²Ù×÷Âë
-logic [1:0]  cmd_mode;           // Ö¸ÁîÄ£Ê½
-assign cmd_opcode = mibus_cmd[127:124];
-assign cmd_mode   = mibus_cmd[123:122];
-
-// OMBUsÍ¨µÀ·Ö½â£¨¸ù¾İ½á¹¹Í¼·ÖÅä£©
-logic [63:0] ch0_data = ombus_ch[0];  // ×´Ì¬Á¿ÊäÈëÍ¨µÀ
-logic [63:0] ch1_data = ombus_ch[1];  // Ğ­·½²î¾ØÕóÍ¨µÀ
-// ...ÆäËûÍ¨µÀ°´Ğè·Ö½â
+logic [64-1:0] Xk1kmatrix [11:0][11:0];
+SystolicArray #(
+    .DWIDTH(64),
+    .ARRAY_SIZE(3)
+) u_systolic (
+    .clk(clk),
+    .rst_n(rst_n),
+    .a_row(F),   // æ¥è‡ªFIFOçš„P_predicted
+    .b_col(matrix_out),      // CEUè®¡ç®—çš„é€†çŸ©é˜µ
+    .load_en(ceu_complete), // CEUå®ŒæˆååŠ è½½
+    .enb_1(ceu_valid_in), // CEUæœ‰æ•ˆä¿¡å·
+    .enb_2_6(cmu_valid_in), // CMUæœ‰æ•ˆä¿¡å·
+    .enb_7_12(ceu_complete), // CEUå®Œæˆä¿¡å·
+    .c_out(Xk1kmatrix)
+);
+generate
+    for (genvar i = 0; i < 12; i++) begin : gen_Xk1k
+        assign X_k1k[i] = Xk1kmatrix[i][0];
+    end
+endgenerate
 
 endmodule

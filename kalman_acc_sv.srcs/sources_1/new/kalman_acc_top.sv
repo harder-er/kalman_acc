@@ -2,160 +2,182 @@
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
 // Engineer: 
-// 
+//
 // Create Date: 2025/03/10 11:35:25
-// Design Name: 
-// Module Name: KalmanFilterTop  // ø®∂˚¬¸¬À≤®∆˜∂•≤„ƒ£øÈ
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description:  µœ÷ø®∂˚¬¸¬À≤®À„∑®µƒ∂•≤„ºØ≥…ƒ£øÈ£¨∞¸∫¨◊¥Ã¨‘§≤‚”Î≤‚¡ø∏¸–¬¡Ω¥ÛΩ◊∂Œ
-// 
-// Dependencies: “¿¿µ◊¥Ã¨‘§≤‚°¢–≠∑Ω≤Ó‘§≤‚°¢‘ˆ“Êº∆À„°¢◊¥Ã¨∏¸–¬µ»◊”ƒ£øÈ
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments: ÷ß≥÷12Œ¨◊¥Ã¨œÚ¡ø∫Õ6Œ¨≤‚¡øœÚ¡øµƒ µ ±¬À≤®¥¶¿Ì
-// 
+// Module Name: KalmanFilterTop
+// Description: Âç°Â∞îÊõºÊª§Ê≥¢Âô®È°∂Â±ÇÊ®°ÂùóÔºåÊîØÊåÅ 12 Áª¥Áä∂ÊÄÅÂíå 6 Áª¥ÊµãÈáè
 //////////////////////////////////////////////////////////////////////////////////
 
-`timescale 1ns / 1ps
-
 module KalmanFilterTop #(
-    parameter STATE_DIM  = 12,
-    parameter MEASURE_DIM = 6
+    parameter STATE_DIM     = 12,
+    parameter MEASURE_DIM   = 6 ,
+    parameter deltat        = 0.01
 )(
-    input  logic         clk,
-    input  logic         rst_n,
+    input  logic                         clk        ,
+    input  logic                         rst_n      ,
+    input  logic                         start      ,
+
+
+    // Á≥ªÁªüÊ®°ÂûãÂèÇÊï∞
+    input  logic [64:0]                  Q_k    [STATE_DIM-1:0][STATE_DIM-1:0],
+    input  logic [64:0]                  R_k    [MEASURE_DIM-1:0][MEASURE_DIM-1:0],
+
+    // ÂÆûÊó∂Êï∞ÊçÆÊé•Âè£
+    input  logic [64:0]                  Z_k    [MEASURE_DIM-1:0],
+    input  logic [64:0]                  X_00   [STATE_DIM-1:0],
+    input  logic [64:0]                  P_00   [STATE_DIM-1:0][STATE_DIM-1:0],
+
+    // Êª§Ê≥¢ÁªìÊûúËæìÂá∫
+    output logic [31:0]                  X_kkout  [STATE_DIM-1:0],
+    output logic [31:0]                  P_kkout  [STATE_DIM-1:0][STATE_DIM-1:0]
+
+);
+
+    // -------------------------------------------------
+    //  ÂÜÖÈÉ®‰ø°Âè∑Â£∞Êòé
+    // -------------------------------------------------
+    logic [63:0]                         X_k1k [STATE_DIM-1:0]; // x_k+1,k
+    logic [63:0]                         X_kk1 [STATE_DIM-1:0]; // x_k,k-1
+    logic [63:0]                         X_kk  [STATE_DIM-1:0]; // x_k,k
+
+
+    logic [63:0]                         P_k1k        [STATE_DIM-1:0][STATE_DIM-1:0]; // P_k+1,k
+    logic [63:0]                         P_kk1        [STATE_DIM-1:0][STATE_DIM-1:0]; // P_k,k-1
+    logic [63:0]                         P_kk         [STATE_DIM-1:0][STATE_DIM-1:0]; // P_k,k
+    logic [63:0]                         P_k1k1       [STATE_DIM-1:0][STATE_DIM-1:0]; // P_k-1,k-1
     
-    // œµÕ≥ƒ£–Õ≤Œ ˝
-    input  logic [31:0]  F [STATE_DIM-1:0][STATE_DIM-1:0],
-    input  logic [31:0]  H [MEASURE_DIM-1:0][STATE_DIM-1:0],
-    input  logic [31:0]  Qk[STATE_DIM-1:0][STATE_DIM-1:0],
-    input  logic [31:0]  Rk[MEASURE_DIM-1:0][MEASURE_DIM-1:0],
+    logic [63:0]                         K_k      [STATE_DIM-1:0][STATE_DIM-1:0];
+
+    logic [63:0]                         F        [STATE_DIM-1:0][STATE_DIM-1:0]; // K_k
+
+
+    logic                                SP_Start, CKG_Start, SCU_Start;
+    // ÂêÑÂ≠êÊ®°ÂùóÂÆåÊàêÊ†áÂøó
+    logic                               sp_done, cp_done, kgc_done, su_done, cu_done;
+    logic                               Init_Valid;
+    logic                               SP_Done;
+    logic                               CKG_Done;
+    logic                               SCU_Done;
+    logic                               MDI_Valid;
+    logic                               SCO_Valid;
+    // -------------------------------------------------
+    // ÊéßÂà∂ÂçïÂÖÉ
+    // -------------------------------------------------
+    KF_ControlUnit u_ControlUnit (
+        .clk        (   clk             ),
+        .rst        (   rst_n           ),
+        .Init_Valid (   Init_Valid      ),
+        .SP_Valid   (   SP_Start        ),
+        .SP_Done    (   sp_done         ),
+        .CKG_Valid  (   CKG_Start       ),
+        .CKG_Done   (   kgc_done        ),
+        .SCU_Valid  (   SCU_Start       ),
+        .SCU_Done   (   su_done         ),
+        .MDI_Valid  (   MDI_Valid       ),
+        .SCO_Valid  (   SCO_Valid       ),
+        .SP_Start   (   SP_Start        ),
+        .CKG_Start  (   CKG_Start       ),
+        .SCU_Start  (   SCU_Start       )
+    );
+
+    Fmake u_Fmake (
+        .clk        ( clk    ),
+        .rst_n      ( rst_n  ),
+        .deltat     ( deltat ),
+        .F          ( F      )
+    );
+    // -------------------------------------------------
+    // Áä∂ÊÄÅÈ¢ÑÊµã
+    // -------------------------------------------------
+    StateUpdate u_StateUpdator (
+        .clk            ( clk       ),
+        .rst_n          ( rst_n     ),
+        .F              ( F         ),
+        .X_kk           ( X_kk      ),
+        .X_k1k          ( X_k1k     ),
+        .fifo_valid     ( sp_done   )
+    );
+
+
+    assign SP_Done = sp_done && cp_done;
+
     
-    //  µ ± ˝æ›Ω”ø⁄
-    input  logic [31:0]  Zk[MEASURE_DIM-1:0],
-    input  logic [31:0]  Xk_prev[STATE_DIM-1:0],
-    input  logic [31:0]  Pk_prev[STATE_DIM-1:0][STATE_DIM-1:0],
-    
-    // ¬À≤®Ω·π˚ ‰≥ˆ
-    output logic [31:0]  Xk_k[STATE_DIM-1:0],
-    output logic [31:0]  Pk_k[STATE_DIM-1:0][STATE_DIM-1:0],
-    
-    // ◊¥Ã¨ª˙øÿ÷∆Ω”ø⁄
-    input  logic         Init_Valid,
-    output logic         SP_Done,
-    output logic         CKG_Done,
-    output logic         SCU_Done,
-    input  logic         MDI_Valid,
-    input  logic         SCO_Valid
-);
+    KalmanGainCalculator #(
+        .DWIDTH    (64)
+    ) u_KalmanGainCalc (
+        .clk             (clk),
+        .rst_n           (rst_n),
+        .Q_k             (Q_k),
+        .P_k1k1          (P_k1k1),
+        .CKG_start       (CKG_Start),
+        .R_k              (R_k),
+        .K_k              (K_k),
+        .data_valid_out  (kgc_done)
+    );
 
-// ================== øÿ÷∆µ•‘™ µ¿˝ªØ ==================
-KF_ControlUnit u_ControlUnit (
-    .clk(clk),
-    .rst(rst_n),
-    // ◊¥Ã¨◊™ªª ‰»Î
-    .Init_Valid(Init_Valid),
-    .SP_Valid(1'b0),
-    .SP_Done(SP_Done),
-    .CKG_Valid(1'b0),
-    .CKG_Done(CKG_Done),
-    .SCU_Valid(1'b0),
-    .SCU_Done(SCU_Done),
-    .MDI_Valid(MDI_Valid),
-    .SCO_Valid(SCO_Valid),
-    // øÿ÷∆ ‰≥ˆ
-    .SP_Start(SP_Start),
-    .CKG_Start(CKG_Start),
-    .SCU_Start(SCU_Start)
-);
+    assign CKG_Done = kgc_done;
 
-// ================== ‘§≤‚Ω◊∂Œ ==================
-// ◊¥Ã¨‘§≤‚ƒ£øÈ
-StatePredictor #(.STATE_DIM(STATE_DIM)) u_StatePredictor (
-    .clk(clk),
-    .rst_n(rst_n),
-    .F(F),
-    .Xk_prev(Xk_prev),
-    .ctrl_flag(SP_Start),    //  ‹◊¥Ã¨ª˙øÿ÷∆
-    .Xk_pred(Xk_k_minus1)
-);
+    // -------------------------------------------------
+    // Áä∂ÊÄÅÊõ¥Êñ∞
+    // -------------------------------------------------
+    StatePredictor #(
+        .VEC_WIDTH(64),
+        .MAT_DIM  (12)
+    ) u_StatePredictor (
+        .clk           ( clk        ),
+        .rst_n         ( rst_n      ),
+        .K_k           ( K_k        ),
+        .Z_k           ( Z_k        ),
+        .X_kk1         ( X_kk1      ),
+        .X_kk          ( X_kk       ),
+        .done          ( su_done    )
+    );
 
-// –≠∑Ω≤Ó‘§≤‚ƒ£øÈ
-//CovariancePredictor #(.STATE_DIM(STATE_DIM)) u_CovPredictor (
-//    .clk(clk),
-//    .rst_n(rst_n),
-//    .F(F),
-//    .Pk_prev(Pk_prev),
-//    .Qk(Qk),
-//    .ctrl_flag(SP_Start),    // ”Î◊¥Ã¨‘§≤‚Õ¨≤Ω
-//    .Pm_k(Pm_k)
-//);
+    // -------------------------------------------------
+    // ÂçèÊñπÂ∑ÆÊõ¥Êñ∞
+    // -------------------------------------------------
+    CovarianceUpdate #(
+        .STATE_DIM(STATE_DIM),
+        .DWIDTH   (64)
+    ) u_CovUpdate (
+        .clk           (clk         ),
+        .rst_n         (rst_n       ),
+        .K_k            (K_k      ),
+        .R_k            (R_k          ),
+        .P_kk1          (P_kk1  ),
+        .P_kk          (P_kk        ),
+        .valid_out     (cu_done     )
+    );
 
-// ================== ∏¸–¬Ω◊∂Œ ==================
-// æÿ’Û◊™÷√ƒ£øÈ£®H^T£©
-MatrixTransBridge #(MEASURE_DIM, STATE_DIM) u_HT_Transpose_Bridge (
-    .matrix_in(H),
-    .matrix_out(HT)
-);
+    assign SCU_Done = cu_done;
 
-// ø®∂˚¬¸‘ˆ“Êº∆À„µ•‘™
-KalmanGainCalculator #(
-    .DWIDTH(64),
-    .CMU_SIZE(3),
-    .FIFO_DEPTH(16)
-) u_KalmanGainCalc (
-    .clk(clk),
-    .rst_n(rst_n),
-    .P_prev_3x3(Pm_k[11:9][11:9]),  // »°3x3◊”æÿ’Û
-    .cmu_valid_in(CKG_Start),
-    .R_matrix(Rk[5:3][5:3]),       // »°3x3◊”æÿ’Û
-    .ceu_valid_in(CKG_Start),
-    .K_k(Kk_sub),                  // 3x3‘ˆ“Ê◊”æÿ’Û
-    .data_valid_out(CKG_Done)
-);
+    // -------------------------------------------------
+    // Êó∂Â∫èÂØπÈΩêÂçïÂÖÉ
+    // -------------------------------------------------
+    DelayUnit #(
+        .DELAY_CYCLES(2),
+        .ROWS        (12),
+        .COLS        (12),
+        .DATA_WIDTH  (64)
+    ) u_DelayX (
+        .clk       ( clk    ),
+        .rst_n     ( rst_n),
+        .data_in   ( Xk1k),
+        .data_out  ( Xkk1)
+    );
 
-// ◊¥Ã¨∏¸–¬ƒ£øÈ
-StateUpdate #(.STATE_DIM(STATE_DIM)) u_StateUpdate (
-    .clk(clk),
-    .rst_n(rst_n),
-    .Kk(Kk),
-    .Zk(Zk),
-    .Xk_pred(Xk_k_minus1),
-    .H(H),
-    .Xk_updated(Xk_k)
-);
+    DelayUnit #(
+        .DELAY_CYCLES(2),
+        .ROWS        (12),
+        .COLS        (1),
+        .DATA_WIDTH  (64)
+    ) u_DelayP (
+        .clk       (clk),
+        .rst_n     (rst_n),
+        .data_in   (P_kk),
+        .data_out  (P_k1k1)
+    );
 
-// –≠∑Ω≤Ó∏¸–¬ƒ£øÈ
-CovarianceUpdate #(.STATE_DIM(STATE_DIM)) u_CovUpdate (
-    .clk(clk),
-    .rst_n(rst_n),
-    .Kk(Kk),
-    .H(H),
-    .Pm_k(Pm_k),
-    .Pk_updated(Pk_k)
-);
 
-// ==================  ±–Ú∂‘∆Îµ•‘™ ==================
-DelayUnit #(3, STATE_DIM*32) u_DelayX (
-    .clk(clk),
-    .rst_n(rst_n),
-    .data_in(Xk_k_minus1),
-    .data_out(Xk_delayed)
-);
-
-DelayUnit #(2, STATE_DIM*STATE_DIM*32) u_DelayP (
-    .clk(clk),
-    .rst_n(rst_n),
-    .data_in(Pm_k),
-    .data_out(Pm_delayed)
-);
-
-// ================== Ω”ø⁄”≥…‰ ==================
-assign SP_Done = u_StatePredictor.done && u_CovPredictor.done;
-assign SCU_Done = u_CovUpdate.done;
 
 endmodule
-

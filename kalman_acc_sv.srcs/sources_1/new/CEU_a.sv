@@ -21,7 +21,7 @@ module CEU_a #(
     input  logic                   clk,
     input  logic                   rst_n,
     // ∂ØÃ¨ ‰»Î
-    input  logic [DBL_WIDTH-1:0]   Theta_1_1,
+//    input  logic [DBL_WIDTH-1:0]   Theta_1_1,
     input  logic [DBL_WIDTH-1:0]   Theta_4_1,
     input  logic [DBL_WIDTH-1:0]   Theta_7_1,
     input  logic [DBL_WIDTH-1:0]   Theta_4_4,

@@ -2,114 +2,112 @@
 //////////////////////////////////////////////////////////////////////////////////
 // Company:
 // Engineer:
-// Create Date: 2025/04/25 17:17:06
+//
+// Create Date: 2025/05/08
 // Module Name: CEU_x
-// Description: ²ÎÊı»¯ CEU_x Ä£¿é£¬Ö§³Ö d/e/f Í¨µÀ£¬Îå¼¶Á÷Ë®£¬ËùÓĞ¸¡µãºËÔÚ¶¥²ãÊµÀı»¯
-// Dependencies: fp_arithmetic.svh (¶¨Òå fp_add_core, fp_mult_core Ä£¿é)
+// Description: "x" é€šé“çš„ CEU è®¡ç®—ï¼šä¸¤çº§æµæ°´ def = T4 + T3
+//              å…¶ä»–é€šé“ y/z å¯å¤ç”¨æœ¬æ¨¡å—ï¼Œæ›¿æ¢å¯¹åº”è¾“å…¥ä¿¡å·å³å¯
+// Dependencies: fp_adder, fp_multiplier
 //////////////////////////////////////////////////////////////////////////////////
 
 module CEU_x #(
-    parameter DBL_WIDTH = 64,
-    parameter CHANNEL   = "d"
+    parameter DBL_WIDTH = 64
 )(
     input  logic                   clk,
     input  logic                   rst_n,
-    input  logic [DBL_WIDTH-1:0]   Theta_ij,
-    input  logic [DBL_WIDTH-1:0]   Theta_ik,
-    input  logic [DBL_WIDTH-1:0]   Theta_mj,
-    input  logic [DBL_WIDTH-1:0]   Theta_mk,
-    input  logic [DBL_WIDTH-1:0]   Theta_mm,
-    input  logic [DBL_WIDTH-1:0]   Q_ii,
-    input  logic [DBL_WIDTH-1:0]   R_ii,
-    input  logic [DBL_WIDTH-1:0]   delta_t,
-    input  logic [DBL_WIDTH-1:0]   delta_t2,
-    input  logic [DBL_WIDTH-1:0]   delta_t_sq,
-    input  logic [DBL_WIDTH-1:0]   delta_t_cu,
-    input  logic [DBL_WIDTH-1:0]   delta_t_qr,
-    output logic [DBL_WIDTH-1:0]   result,
+
+
+    input  logic [DBL_WIDTH-1:0]   Theta_1_7,  
+    input  logic [DBL_WIDTH-1:0]   Theta_4_4,   
+
+    input  logic [DBL_WIDTH-1:0]   Theta_7_4,   
+    input  logic [DBL_WIDTH-1:0]   Theta_10_4,  
+    input  logic [DBL_WIDTH-1:0]   Theta_7_7,  
+    
+    input  logic [DBL_WIDTH-1:0]   Theta_10_1,  
+
+    input  logic [DBL_WIDTH-1:0]   Theta_10_7,  
+    input  logic [DBL_WIDTH-1:0]   Theta_1_4,   
+
+    // Q/R å™ªå£°é¡¹
+    input  logic [DBL_WIDTH-1:0]   Q_1_4,      
+    input  logic [DBL_WIDTH-1:0]   R_1_4,       
+
+    // å›ºå®šæ—¶é—´å‚æ•°ï¼ˆç¤ºä¾‹ï¼ŒæŒ‰å›¾ä¸­ç»¿è‰²ç›’å­é…ç½®ï¼‰
+    input  logic [DBL_WIDTH-1:0]   delta_t,     // Î”t
+    input  logic [DBL_WIDTH-1:0]   delta_t2,    // 2Î”t
+    input  logic [DBL_WIDTH-1:0]   delta_t_sq,  // ?Î”t?
+    input  logic [DBL_WIDTH-1:0]   delta_t_cu,  // 1/6Î”t?
+    input  logic [DBL_WIDTH-1:0]   delta_t_qu,  // 5/12Î”t?
+    input  logic [DBL_WIDTH-1:0]   delta_t_qi,  // 1/12Î”t?
+
+    // è¾“å‡º
+    output logic [DBL_WIDTH-1:0]   x,
     output logic                   valid_out
 );
 
-    `include "fp_arithmetic.svh"
 
-    // Á÷Ë®Ïß¼Ä´æÆ÷
-    typedef struct packed { logic [DBL_WIDTH-1:0] A1, X1; } stage1_t;
-    typedef struct packed { logic [DBL_WIDTH-1:0] X2, X3, A2; } stage2_t;
-    typedef struct packed { logic [DBL_WIDTH-1:0] T1, T2, M1; } stage3_t;
-    typedef struct packed { logic [DBL_WIDTH-1:0] X4, T3, T4; } stage4_t;
 
-    stage1_t stage1_q;
-    stage2_t stage2_q;
-    stage3_t stage3_q;
-    stage4_t stage4_q;
-    logic [4:0] valid_pipe;
+    // ---------------- æµæ°´çº¿å¯„å­˜å™¨ ----------------
+    logic [DBL_WIDTH-1:0] stage1_A1, stage1_M1;
+    logic [DBL_WIDTH-1:0] stage2_A2, stage2_M2, stage2_M3;
+    logic [DBL_WIDTH-1:0] stage3_X1, stage3_X2, stage3_X3;
+    logic [DBL_WIDTH-1:0] stage4_T1, stage4_T2;
+    logic [1:0]            pipe_valid;
 
-    // ¶¥²ãĞÅºÅ
-    wire [DBL_WIDTH-1:0] w_A1, w_X1;
-    wire [DBL_WIDTH-1:0] w_X2, w_X3, w_A2;
-    wire [DBL_WIDTH-1:0] w_T1, w_T2, w_M1;
-    wire [DBL_WIDTH-1:0] w_X4, w_T3, w_T4;
+    // å™ªå£°é¡¹ç»„åˆ
+    wire [DBL_WIDTH-1:0] sum_QR1, sum_QR2, sum_QR3;
+    wire [DBL_WIDTH-1:0] sum_QR = fp_add(sum_QR1, sum_QR2 /* + sum_QR3 if needed */);
 
-    // ×éºÏÏµÊı M1
-    wire [DBL_WIDTH-1:0] mul3 = 64'h4008_0000_0000_0000; // 3.0
-    wire [DBL_WIDTH-1:0] mul4 = 64'h4010_0000_0000_0000; // 4.0
-    wire [DBL_WIDTH-1:0] mul5 = 64'h4014_0000_0000_0000; // 5.0
-    wire [DBL_WIDTH-1:0] coeff = (CHANNEL=="e")? mul4 : (CHANNEL=="f")? mul5 : mul3;
+    // ================= é¡¶å±‚å­æ¨¡å—å®ä¾‹åŒ– =================
+    // Stage1: A1 = Î˜[1,7] + Î˜[2,8]ï¼›  M1 = 3 * Î˜[3,9]
+    fp_adder      U1_add_A1 (.clk(clk), .a(Theta_1_7), .b(Theta_2_8), .result(stage1_A1));
+    fp_multiplier U1_mul_M1 (.clk(clk), .a(64'h4008000000000000), // 3.0
+                                      .b(Theta_3_9), .result(stage1_M1));
 
-    // ====== ¶¥²ã×ÓÄ£¿éÊµÀı»¯ ======
-    // Stage1: A1, X1
-    fp_adder      U1 (.clk(clk), .a(Theta_mk), .b(Theta_ik), .result(w_A1));
-    fp_multiplier U2 (.clk(clk), .a(delta_t2),   .b(Theta_ik), .result(w_X1));
+    // Stage2: A2 = Î˜[4,4] + stage1_M1ï¼› M2 = 4 * Î˜[5,5]ï¼› M3 = 5 * Î˜[6,6]
+    fp_adder      U2_add_A2 (.clk(clk), .a(Theta_4_4), .b(stage1_M1), .result(stage2_A2));
+    fp_multiplier U2_mul_M2 (.clk(clk), .a(64'h4010000000000000), // 4.0
+                                      .b(Theta_5_5), .result(stage2_M2));
+    fp_multiplier U2_mul_M3 (.clk(clk), .a(64'h4014000000000000), // 5.0
+                                      .b(Theta_6_6), .result(stage2_M3));
 
-    // Stage2: X2, X3, A2
-    fp_multiplier U3 (.clk(clk), .a(delta_t_sq), .b(Theta_mj),  .result(w_X2));
-    fp_multiplier U4 (.clk(clk), .a(delta_t_cu), .b(w_A1),     .result(w_X3));
-    fp_adder      U5 (.clk(clk), .a(Theta_ij), .b(w_X1),       .result(w_A2));
+    // Stage3: X1 = delta_t2 * stage1_A1ï¼› X2 = delta_t_sq * stage2_A2ï¼› X3 = delta_t_cu * stage2_M2
+    fp_multiplier U3_mul_X1 (.clk(clk), .a(delta_t2),   .b(stage1_A1), .result(stage3_X1));
+    fp_multiplier U3_mul_X2 (.clk(clk), .a(delta_t_sq),  .b(stage2_A2), .result(stage3_X2));
+    fp_multiplier U3_mul_X3 (.clk(clk), .a(delta_t_cu),  .b(stage2_M2), .result(stage3_X3));
 
-    // Stage3: T1, T2, M1
-    fp_adder      U6 (.clk(clk), .a(w_X2),   .b(w_X3), .result(w_T1));
-    fp_adder      U7 (.clk(clk), .a(w_A2),   .b(w_T1), .result(w_T2));
-    fp_multiplier U8 (.clk(clk), .a(coeff), .b(Theta_mm), .result(w_M1));
+    // Stage4: T1 = X1 + X2ï¼›  T2 = X3 + (Q+R)
+    fp_adder      U4_add_T1 (.clk(clk), .a(stage3_X1), .b(stage3_X2), .result(stage4_T1));
 
-    // Stage4: X4, T3, T4
-    fp_multiplier U9  (.clk(clk), .a(delta_t_qr), .b(w_M1),     .result(w_X4));
-    fp_adder      U10 (.clk(clk), .a(Q_ii),        .b(R_ii),     .result(w_T3));
-    fp_adder      U11 (.clk(clk), .a(w_X4),        .b(w_T3),     .result(w_T4));
+    // Q+R ä¸‰è·¯æ±‚å’Œ
+    fp_adder      U4_add_QR1(.clk(clk), .a(Q_1_7), .b(R_1_7), .result(sum_QR1));
+    fp_adder      U4_add_QR2(.clk(clk), .a(Q_2_8), .b(R_2_8), .result(sum_QR2));
+    // å¦‚æœç¬¬ä¸‰è·¯ä¹Ÿéœ€è¦ï¼Œå†åŠ ä¸€ä¸ª .a(Q_3_9),.b(R_3_9)...
 
-    // Stage5: Final result
-    fp_adder      U12 (.clk(clk), .a(w_T2),        .b(w_T4),     .result(result));
+    fp_adder      U4_add_T2 (.clk(clk), .a(stage3_X3), .b(sum_QR), .result(stage4_T2));
 
-    // ====== Ê±ĞòÂß¼­ ======
+    // ================= æµæ°´çº¿å¯„å­˜ä¸æ§åˆ¶ =================
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            stage1_q <= '0;
-            stage2_q <= '0;
-            stage3_q <= '0;
-            stage4_q <= '0;
-            valid_pipe <= '0;
-            result <= '0;
+            stage1_A1 <= '0;   stage1_M1 <= '0;
+            stage2_A2 <= '0;   stage2_M2 <= '0;   stage2_M3 <= '0;
+            stage3_X1 <= '0;   stage3_X2 <= '0;   stage3_X3 <= '0;
+            stage4_T1 <= '0;   stage4_T2 <= '0;
+            pipe_valid<= 2'b00;
         end else begin
-            // Í¬²½¸÷¼¶
-            stage1_q.A1 <= w_A1;
-            stage1_q.X1 <= w_X1;
-
-            stage2_q.X2 <= w_X2;
-            stage2_q.X3 <= w_X3;
-            stage2_q.A2 <= w_A2;
-
-            stage3_q.T1 <= w_T1;
-            stage3_q.T2 <= w_T2;
-            stage3_q.M1 <= w_M1;
-
-            stage4_q.X4 <= w_X4;
-            stage4_q.T3 <= w_T3;
-            stage4_q.T4 <= w_T4;
-
-            // ¸üĞÂ valid
-            valid_pipe <= {valid_pipe[3:0], 1'b1};
+            // åŒæ­¥å¯„å­˜
+            stage1_A1 <= stage1_A1;   stage1_M1 <= stage1_M1;
+            stage2_A2 <= stage2_A2;   stage2_M2 <= stage2_M2;   stage2_M3 <= stage2_M3;
+            stage3_X1 <= stage3_X1;   stage3_X2 <= stage3_X2;   stage3_X3 <= stage3_X3;
+            stage4_T1 <= stage4_T1;   stage4_T2 <= stage4_T2;
+            // valid ç®¡çº¿
+            pipe_valid <= {pipe_valid[0], 1'b1};
         end
     end
 
-    assign valid_out = valid_pipe[4];
+    // æœ€ç»ˆè¾“å‡º
+    assign x         = fp_add(stage4_T1, stage4_T2);
+    assign valid_out = pipe_valid[1];
 
 endmodule

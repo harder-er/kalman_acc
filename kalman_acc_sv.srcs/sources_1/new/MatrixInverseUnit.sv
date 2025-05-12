@@ -5,106 +5,492 @@
 // 
 // Create Date: 2025/03/10 17:01:06
 // Design Name: 
-// Module Name: MatrixInverseUnit  // ¾ØÕóÇóÄæµ¥ÔªÄ£¿é
+// Module Name: MatrixInverseUnit  // çŸ©é˜µæ±‚é€†å•å…ƒæ¨¡å—
 // Project Name: 
 // Target Devices: 
 // Tool Versions: 
-// Description: ÊµÏÖ3x3¾ØÕóÇóÄæÔËËã£¬Ö§³Ö¸¡µãÊı¾İ¸ñÊ½µÄÁ÷Ë®Ïß´¦Àí
+// Description: å®ç°3x3çŸ©é˜µæ±‚é€†è¿ç®—ï¼Œæ”¯æŒæµ®ç‚¹æ•°æ®æ ¼å¼çš„æµæ°´çº¿å¤„ç†
 // 
-// Dependencies: ÒÀÀµCEUÏµÁĞ¸¡µãÔËËãµ¥Ôª£¨CEU_a, CEU_d, CEU_divisionµÈ£©
+// Dependencies: ä¾èµ–CEUç³»åˆ—æµ®ç‚¹è¿ç®—å•å…ƒï¼ˆCEU_a, CEU_d, CEU_divisionç­‰ï¼‰
 // 
 // Revision:
 // Revision 0.01 - File Created
-// Additional Comments: ²ÉÓÃÈı¼¶Á÷Ë®Ïß¼Ü¹¹£¬Ö§³Ö¾ØÕóÔªËØµÄ²¢ĞĞ¼ÆËã
+// Additional Comments: é‡‡ç”¨ä¸‰çº§æµæ°´çº¿æ¶æ„ï¼Œæ”¯æŒçŸ©é˜µå…ƒç´ çš„å¹¶è¡Œè®¡ç®—
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
 
 module MatrixInverseUnit #(
-    parameter DWIDTH = 64  // Êı¾İ¿í¶È£¨¸¡µã¾«¶ÈÎ»¿í£©
+    parameter DWIDTH = 64  // æ•°æ®å®½åº¦ï¼ˆæµ®ç‚¹ç²¾åº¦ä½å®½ï¼‰
 )(
-    input  logic             clk,           // Ê±ÖÓĞÅºÅ
-    input  logic             rst_n,         // ¸´Î»ĞÅºÅ£¨µÍÓĞĞ§£©
+    input  logic                clk,           // æ—¶é’Ÿä¿¡å·
+    input  logic                rst_n,         // å¤ä½ä¿¡å·ï¼ˆä½æœ‰æ•ˆï¼‰
+    input  logic [DWIDTH-1:0]   P_prev [0:12-1][0:12-1],   //p_k-1,k-1
+    input  logic [DWIDTH-1:0]   Qk [0:12-1][0:12-1],  
+    input  logic [DWIDTH-1:0]   Rk [0:5][0:5],  // æµ‹é‡å™ªå£°çŸ©é˜µ
+    output logic [DWIDTH-1:0]   inv_max [0:5][0:5]
+);
+
+
+// ==== ä¸­é—´ç»“æœå¯„å­˜å™¨ï¼ˆå¯¹åº”å›¾ä¸­Intermediate Result Regï¼‰
+//-----------------------------------------------------------------
+logic [DWIDTH-1:0] a, b, c, d, e, f, x, y, z;  // çŸ©é˜µè¿ç®—ä¸­é—´å˜é‡
+
+// ==== CEUæ¨¡å—å®ä¾‹åŒ–ï¼ˆæŒ‰æµç¨‹å›¾å¤„ç†é¡ºåºï¼‰
+CEU_a #(
+    .DBL_WIDTH(64)
+) u_CEU_a (
+    .clk          (clk),
+    .rst_n        (rst_n),
+    // åŠ¨æ€è¾“å…¥ï¼šæ›¿æ¢ä¸º P_prev[i][j] å½¢å¼
+    .Theta_1_1    (P_prev[0][0]),
+    .Theta_4_1    (P_prev[3][0]),
+    .Theta_7_1    (P_prev[6][0]),
+    .Theta_4_4    (P_prev[3][3]),
+    .Theta_10_1   (P_prev[9][0]),
+    .Theta_7_4    (P_prev[6][3]),
+    .Theta_10_4   (P_prev[9][3]),
+    .Theta_7_7    (P_prev[6][6]),
+    .Theta_10_7   (P_prev[9][6]),
+    .Theta_10_10  (P_prev[9][9]),
+    .Q_1_1        (Qk[0][0]),
+    .R_1_1        (Rk[0][0]),
+    // å›ºå®šå‚æ•°
+    .delta_t2     (delta_t2),
+    .delta_t_sq   (delta_t_sq),
+    .delta_t_cu   (delta_t_cu),
+    .delta_t_qu   (delta_t_qu),
+    .delta_t_qi   (delta_t_qi),
+    .delta_t_sx   (delta_t_sx),
+    // è¾“å‡º
+    .a_out        (a),
+    .valid_out    (valid_out)
+);
+
+CEU_a #(
+    .DBL_WIDTH(64)
+) u_CEU_b (
+    .clk          (clk),
+    .rst_n        (rst_n),
+    // åŠ¨æ€è¾“å…¥ï¼šæ›¿æ¢ä¸º P_prev[i][j] å½¢å¼
+    .Theta_4_1    (P_prev[4][1]),
+    .Theta_7_1    (P_prev[7][1]),
+    .Theta_4_4    (P_prev[4][4]),
+    .Theta_10_1   (P_prev[10][1]),
+    .Theta_7_4    (P_prev[7][4]),
+    .Theta_10_4   (P_prev[10][4]),
+    .Theta_7_7    (P_prev[7][7]),
+    .Theta_10_7   (P_prev[10][7]),
+    .Theta_10_10  (P_prev[10][10]),
+    .Q_1_1        (Qk[1][1]),
+    .R_1_1        (Rk[1][1]),
+    // å›ºå®šå‚æ•°
+    .delta_t2     (delta_t2),
+    .delta_t_sq   (delta_t_sq),
+    .delta_t_cu   (delta_t_cu),
+    .delta_t_qu   (delta_t_qu),
+    .delta_t_qi   (delta_t_qi),
+    .delta_t_sx   (delta_t_sx),
+    // è¾“å‡º
+    .a_out        (b),
+    .valid_out    (valid_out)
+);
     
-    // MIBus½Ó¿Ú£¨Ö÷¿ØÖÆ×ÜÏß£©
-    input  logic [127:0]     mibus_cmd,     // ¿ØÖÆÖ¸Áî×ÜÏß£¨º¬²Ù×÷ÂëºÍÊ¹ÄÜĞÅºÅ£©
-    output logic [63:0]      mibus_status,  // ×´Ì¬·´À¡×ÜÏß£¨º¬ÔËËãÍê³É±êÖ¾£©
-    
-    // MTBus½Ó¿Ú£¨¾ØÕó´«Êä×ÜÏß£©
-    input  logic [DWIDTH-1:0] mtbus_ch [8:0],  // 9Í¨µÀÊäÈë£¨¶ÔÓ¦3x3¾ØÕóÔªËØ£©
-    output logic [DWIDTH-1:0] result_ch [8:0]  // 9Í¨µÀÊä³ö£¨¶ÔÓ¦Äæ¾ØÕóÔªËØ£©
+
+CEU_a #(
+    .DBL_WIDTH(64)
+) u_CEU_c (
+    .clk          (clk),
+    .rst_n        (rst_n),
+    // åŠ¨æ€è¾“å…¥ï¼šæ›¿æ¢ä¸º P_prev[i][j] å½¢å¼
+    .Theta_1_1    (P_prev[2][2]),
+    .Theta_4_1    (P_prev[5][2]),
+    .Theta_7_1    (P_prev[8][2]),
+    .Theta_4_4    (P_prev[5][5]),
+    .Theta_10_1   (P_prev[11][2]),
+    .Theta_7_4    (P_prev[8][5]),
+    .Theta_10_4   (P_prev[11][5]),
+    .Theta_7_7    (P_prev[8][8]),
+    .Theta_10_7   (P_prev[11][8]),
+    .Theta_10_10  (P_prev[11][11]),
+    .Q_1_1        (Qk[2][2]),
+    .R_1_1        (Rk[2][2]),
+    // å›ºå®šå‚æ•°
+    .delta_t2     (delta_t2),
+    .delta_t_sq   (delta_t_sq),
+    .delta_t_cu   (delta_t_cu),
+    .delta_t_qu   (delta_t_qu),
+    .delta_t_qi   (delta_t_qi),
+    .delta_t_sx   (delta_t_sx),
+    // è¾“å‡º
+    .a_out        (c),
+    .valid_out    (valid_out)
 );
 
-// ==== ÊäÈë¼Ä´æÆ÷×é£¨¶ÔÓ¦Í¼ÖĞInput regÄ£¿é£©
+// ---------------------------------------------------------
+// åœ¨ä¸Šå±‚æ¨¡å—ä¸­ä¾‹åŒ– CEU_dï¼ˆ"d" é€šé“æ ¸å¿ƒè®¡ç®—ï¼‰
+// ---------------------------------------------------------
+
+// æŠŠæ‰€æœ‰ (i,j) æ”¹ä¸º (i-1, j-1)
+CEU_d #(
+    .DBL_WIDTH(64)
+) u_CEU_d (
+    .clk         (clk),
+    .rst_n       (rst_n),
+    // åŠ¨æ€è¾“å…¥ï¼šç´¢å¼•å‡å‡ä¸€
+    .Theta_10_7  (P_prev[9][6]),    // 10â†’9, 7â†’6
+    .Theta_7_4   (P_prev[6][3]),    // 7â†’6, 4â†’3
+    .Theta_10_4  (P_prev[9][3]),    // 10â†’9, 4â†’3
+    .Theta_4_7   (P_prev[3][6]),    // 4â†’3, 7â†’6
+    .Theta_10_10 (P_prev[9][9]),    // 10â†’9, 10â†’9
+    .Theta_4_4   (P_prev[3][3]),    // 4â†’3, 4â†’3
+    .Q_4_4       (Qk[3][3]),        // 4â†’3, 4â†’3
+    .R_4_4       (Rk[3][3]),        // 4â†’3, 4â†’3
+    // å›ºå®šæ—¶é—´å‚æ•°
+    .delta_t2    (delta_t2),
+    .delta_t_sq  (delta_t_sq),
+    .delta_t_hcu (delta_t_hcu),
+    .delta_t_qr  (delta_t_qr),
+    // è¾“å‡º
+    .d           (d),
+    .valid_out   (valid_minus)
+);
+
+
+CEU_d #(
+    .DBL_WIDTH(64)
+) u_CEU_e (
+    .clk         (clk),
+    .rst_n       (rst_n),
+    // åŠ¨æ€è¾“å…¥ï¼šæŒ‰ "d" é€šé“å¯¹åº”çš„ Î˜
+    .Theta_10_7  (P_prev[10][7]),    // æˆ–è€…ä½ è‡ªå·±çš„ä¿¡å·å
+    .Theta_7_4   (P_prev[7][4]),
+    .Theta_10_4  (P_prev[10][4]),
+    .Theta_4_7   (P_prev[4][7]),
+    .Theta_10_10 (P_prev[10][10]),
+    .Theta_4_4   (P_prev[4][4]),
+    .Q_4_4       (Qk[4][4]),
+    .R_4_4       (Rk[4][4]),
+    // å›ºå®šæ—¶é—´å‚æ•°ï¼ˆä¸Šå±‚é¢„å…ˆè®¡ç®—æˆ–å®šä¹‰ï¼‰
+    .delta_t2    (delta_t2),
+    .delta_t_sq  (delta_t_sq),
+    .delta_t_hcu (delta_t_hcu),
+    .delta_t_qr  (delta_t_qr),
+    // è¾“å‡º
+    .d           (e),
+    .valid_out   (d_valid)          // æˆ–è€… valid_dï¼Œæ ¹æ®ä½ çš„å‘½å
+);
+
+// æŠŠæ‰€æœ‰ (i,j) æ”¹ä¸º (i+1, j+1)
+CEU_d #(
+    .DBL_WIDTH(64)
+) u_CEU_f (
+    .clk         (clk),
+    .rst_n       (rst_n),
+    // åŠ¨æ€è¾“å…¥ï¼šç´¢å¼•å‡åŠ ä¸€
+    .Theta_10_7  (P_prev[11][8]),   // 10â†’11, 7â†’8
+    .Theta_7_4   (P_prev[8][5]),    // 7â†’8, 4â†’5
+    .Theta_10_4  (P_prev[11][5]),   // 10â†’11, 4â†’5
+    .Theta_4_7   (P_prev[5][8]),    // 4â†’5, 7â†’8
+    .Theta_10_10 (P_prev[11][11]),  // 10â†’11, 10â†’11
+    .Theta_4_4   (P_prev[5][5]),    // 4â†’5, 4â†’5
+    .Q_4_4       (Qk[5][5]),        // 4â†’5, 4â†’5
+    .R_4_4       (Rk[5][5]),        // 4â†’5, 4â†’5
+    // å›ºå®šæ—¶é—´å‚æ•°
+    .delta_t2    (delta_t2),
+    .delta_t_sq  (delta_t_sq),
+    .delta_t_hcu (delta_t_hcu),
+    .delta_t_qr  (delta_t_qr),
+    // è¾“å‡º
+    .d           (f),
+    .valid_out   (valid_plus)
+);
+
+// ---------------------------------------------------------
+// CEU_x æ¨¡å—ä¾‹åŒ–
+// ---------------------------------------------------------
+
+CEU_x #(
+    .DBL_WIDTH(64)
+) u_CEU_x (
+    .clk        (clk),
+    .rst_n      (rst_n),
+
+    .Theta_1_7  (P_prev[0][6]),   // 1â†’0, 7â†’6
+    .Theta_4_4  (P_prev[3][3]),   // 4â†’3, 4â†’3
+
+    .Theta_7_4  (P_prev[6][3]),   // 7â†’6, 4â†’3
+    .Theta_10_4 (P_prev[9][3]),   // 10â†’9, 4â†’3
+    .Theta_7_7  (P_prev[6][6]),   // 7â†’6, 7â†’6
+
+    .Theta_10_1 (P_prev[9][0]),   // 10â†’9, 1â†’0
+
+    .Theta_10_7 (P_prev[9][6]),   // 10â†’9, 7â†’6
+    .Theta_1_4  (P_prev[0][3]),   // 1â†’0, 4â†’3
+
+    .Q_1_4      (Qk[0][3]),       // 1â†’0, 4â†’3
+    .R_1_4      (Rk[0][3]),       // 1â†’0, 4â†’3
+
+    .delta_t    (delta_t),
+    .delta_t2   (delta_t2),
+    .delta_t_sq (delta_t_sq),
+    .delta_t_cu (delta_t_cu),
+    .delta_t_qu (delta_t_qu),
+    .delta_t_qi (delta_t_qi),
+
+    .x          (x),
+    .valid_out  (x_valid_minus1)
+);
+
+
+CEU_x #(
+    .DBL_WIDTH(64)
+) u_CEU_y (
+    .clk        (clk),
+    .rst_n      (rst_n),
+
+    .Theta_1_7  (P_prev[1][7]),   
+    .Theta_4_4  (P_prev[4][4]),   
+
+    .Theta_7_4  (P_prev[7][4]),   
+    .Theta_10_4 (P_prev[10][4]),   
+    .Theta_7_7  (P_prev[7][7]),   
+
+    .Theta_10_1 (P_prev[10][1]),  
+
+    .Theta_10_7 (P_prev[10][7]),    
+    .Theta_1_4  (P_prev[1][4]),  
+
+    // å™ªå£°é¡¹ Q/R
+    .Q_1_4      (Qk[1][4]),       // Q[1,7]
+    .R_1_4      (Rk[1][4]),       // R[1,7]
+
+    // å›ºå®šæ—¶é—´å‚æ•°
+    .delta_t    (delta_t),
+    .delta_t2   (delta_t2),
+    .delta_t_sq (delta_t_sq),
+    .delta_t_cu (delta_t_cu),
+    .delta_t_qu (delta_t_qu),
+    .delta_t_qi (delta_t_qi),
+
+    // è¾“å‡º
+    .x          (y),
+    .valid_out  (x_valid)
+);
+
+CEU_x #(
+    .DBL_WIDTH(64)
+) u_CEU_z (
+    .clk        (clk),
+    .rst_n      (rst_n),
+
+    .Theta_1_7  (P_prev[2][8]),   // 1â†’2, 7â†’8
+    .Theta_4_4  (P_prev[5][5]),   // 4â†’5, 4â†’5
+
+    .Theta_7_4  (P_prev[8][5]),   // 7â†’8, 4â†’5
+    .Theta_10_4 (P_prev[11][5]),  // 10â†’11, 4â†’5
+    .Theta_7_7  (P_prev[8][8]),   // 7â†’8, 7â†’8
+
+    .Theta_10_1 (P_prev[11][2]),  // 10â†’11, 1â†’2
+
+    .Theta_10_7 (P_prev[11][8]),  // 10â†’11, 7â†’8
+    .Theta_1_4  (P_prev[2][5]),   // 1â†’2, 4â†’5
+
+    .Q_1_4      (Qk[2][5]),       // 1â†’2, 4â†’5
+    .R_1_4      (Rk[2][5]),       // 1â†’2, 4â†’5
+
+    .delta_t    (delta_t),
+    .delta_t2   (delta_t2),
+    .delta_t_sq (delta_t_sq),
+    .delta_t_cu (delta_t_cu),
+    .delta_t_qu (delta_t_qu),
+    .delta_t_qi (delta_t_qi),
+
+    .x          (z),
+    .valid_out  (x_valid_plus1)
+);
+
+// ================== ç¬¬äºŒè®¡ç®—é˜¶æ®µï¼šè¡Œåˆ—å¼è®¡ç®— ==================
+// è®¡ç®—Î± = a*d - x^2?ï¼ˆè¡Œåˆ—å¼æ ¸å¿ƒé¡¹ï¼‰
+CEU_alpha u_CEU_alpha1 (
+    .clk        (clk),
+    .in1        (a),             // ç¬¬ä¸€è¡Œç¬¬ä¸€åˆ—ä¹˜ç§¯é¡¹
+    .in2        (d),             // ç¬¬äºŒè¡Œç¬¬äºŒåˆ—ä¹˜ç§¯é¡¹
+    .in3        (x),             // äº¤å‰é¡¹å¹³æ–¹
+    .out        (alpha1),          // è¾“å‡ºè¡Œåˆ—å¼å€¼Î±
+    .validout   (valid_out1)
+);
+CEU_alpha u_CEU_alpha2 (
+    .clk        (clk),
+    .in1        (b),             // ç¬¬ä¸€è¡Œç¬¬ä¸€åˆ—ä¹˜ç§¯é¡¹
+    .in2        (e),             // ç¬¬äºŒè¡Œç¬¬äºŒåˆ—ä¹˜ç§¯é¡¹
+    .in3        (y),             // äº¤å‰é¡¹å¹³æ–¹
+    .out        (alpha2),          // è¾“å‡ºè¡Œåˆ—å¼å€¼Î±
+    .validout   (valid_out2)
+);
+
+CEU_alpha u_CEU_alpha3 (
+    .clk        (clk),
+    .in1        (c),             // ç¬¬ä¸€è¡Œç¬¬ä¸€åˆ—ä¹˜ç§¯é¡¹
+    .in2        (f),             // ç¬¬äºŒè¡Œç¬¬äºŒåˆ—ä¹˜ç§¯é¡¹
+    .in3        (z),             // äº¤å‰é¡¹å¹³æ–¹
+    .out        (alpha3),          // è¾“å‡ºè¡Œåˆ—å¼å€¼Î±
+    .validout   (valid_out3)
+);
+
+
+// ================== ç¬¬ä¸‰è®¡ç®—é˜¶æ®µï¼šé€†çŸ©é˜µå…ƒç´ è®¡ç®— ==================
+// è®¡ç®—1/Î±ï¼ˆè¡Œåˆ—å¼å€’æ•°ï¼‰
+CEU_division u_CEU_div11 (
+    .clk        (clk),
+    .numerator  (a),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .denominator(alpha1),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .quotient   (inv_alpha11)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+CEU_division u_CEU_div12 (
+    .clk        (clk),
+    .numerator  (d),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .denominator(alpha1),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .quotient   (inv_alpha12)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+CEU_division u_CEU_div13 (
+    .clk        (clk),
+    .numerator  (x),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .denominator(alpha1),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .quotient   (inv_alpha13)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+fp_suber u_fp_suber_x (
+    .clk        (clk),
+    .a          (64'h0),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .b          (inv_alpha13),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .result     (_inv_alpha13)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+CEU_division u_CEU_div21 (
+    .clk        (clk),
+    .numerator  (b),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .denominator(alpha2),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .quotient   (inv_alpha21)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+CEU_division u_CEU_div22 (
+    .clk        (clk),
+    .numerator  (e),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .denominator(alpha2),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .quotient   (inv_alpha22)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+CEU_division u_CEU_div23 (
+    .clk        (clk),
+    .numerator  (y),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .denominator(alpha2),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .quotient   (inv_alpha23)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+fp_suber u_fp_suber_y (
+    .clk        (clk),
+    .a          (64'h0),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .b          (inv_alpha23),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .result     (_inv_alpha23)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+CEU_division u_CEU_div31 (
+    .clk        (clk),
+    .numerator  (c),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .denominator(alpha3),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .quotient   (inv_alpha31)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+CEU_division u_CEU_div32 (
+    .clk        (clk),
+    .numerator  (f),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .denominator(alpha3),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .quotient   (inv_alpha32)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+
+CEU_division u_CEU_div33 (
+    .clk        (clk),
+    .numerator  (z),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .denominator(alpha3),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .quotient   (inv_alpha33)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+fp_suber u_fp_suber_z (
+    .clk        (clk),
+    .a          (64'h0),     // åˆ†å­é¡¹ï¼ˆç»„åˆä¸­é—´ç»“æœï¼‰
+    .b          (inv_alpha33),         // åˆ†æ¯é¡¹ï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    .result     (_inv_alpha33)      // è¾“å‡ºå€’æ•°ç»“æœ1/Î±
+);
+// ================== è¾“å‡ºé˜¶æ®µï¼šé€†çŸ©é˜µå…ƒç´ åˆæˆ ==================
+// è®¡ç®—é€†çŸ©é˜µç¬¬ä¸€è¡Œç¬¬ä¸€åˆ—å…ƒç´ ï¼š(d*e - y^2?)/Î±
+    // å£°æ˜ï¼š6Ã—6 å¯„å­˜å™¨ç¼“å­˜
+    logic [DWIDTH-1:0] result_reg [0:5][0:5];
+
+    always_ff @(posedge clk) begin
+        if (!rst_n) begin
+            // å¤ä½æ—¶å…¨éƒ¨æ¸…é›¶
+            for (int i = 0; i < 6; i++) begin
+                for (int j = 0; j < 6; j++) begin
+                    result_reg[i][j] <= '0;
+                end
+            end
+        end else begin
+            // Row 0
+            result_reg[0][0] <= inv_alpha12;               // d / (a*d - x^2)
+            result_reg[0][1] <= 64'h0;                           // çŸ©é˜µç¬¬0è¡Œç¬¬1åˆ—ä¸º 0
+            result_reg[0][2] <= 64'h0;                           // ç¬¬0è¡Œç¬¬2åˆ—ä¸º 0
+            result_reg[0][3] <= _inv_alpha13 ;               // -x/(a*d - x^2)
+            result_reg[0][4] <= 64'h0;
+            result_reg[0][5] <= 64'h0;
+
+            // Row 1
+            result_reg[1][0] <= 64'h0;
+            result_reg[1][1] <= inv_alpha22;                // e / (b*e - y^2)
+            result_reg[1][2] <= 64'h0;
+            result_reg[1][3] <= 64'h0;
+            result_reg[1][4] <= _inv_alpha23;                // -y/(b*e - y^2)
+            result_reg[1][5] <= 64'h0;
+
+            // Row 2
+            result_reg[2][0] <= 64'h0;
+            result_reg[2][1] <= 64'h0;
+            result_reg[2][2] <= inv_alpha32;               // f / (c*f - z^2)
+            result_reg[2][3] <= 64'h0;
+            result_reg[2][4] <= 64'h0;
+            result_reg[2][5] <= _inv_alpha33;               // -z/(c*f - z^2)
+
+            // Row 3
+            result_reg[3][0] <= _inv_alpha13;               // -x/(a*d - x^2)
+            result_reg[3][1] <= 64'h0;
+            result_reg[3][2] <= 64'h0;
+            result_reg[3][3] <= inv_alpha11;               // a/(a*d - x^2)
+            result_reg[3][4] <= 64'h0;
+            result_reg[3][5] <= 64'h0;
+
+            // Row 4
+            result_reg[4][0] <= 64'h0;
+            result_reg[4][1] <= _inv_alpha23;                // -y/(b*e - y^2)
+            result_reg[4][2] <= 64'h0;
+            result_reg[4][3] <= 64'h0;
+            result_reg[4][4] <= inv_alpha21;                // b/(b*e - y^2)
+            result_reg[4][5] <= 64'h0;
+
+            // Row 5
+            result_reg[5][0] <= 64'h0;
+            result_reg[5][1] <= 64'h0;
+            result_reg[5][2] <= _inv_alpha33;               // -z/(c*f - z^2)
+            result_reg[5][3] <= 64'h0;
+            result_reg[5][4] <= 64'h0;
+            result_reg[5][5] <= inv_alpha31;               // c/(c*f - z^2)
+        end
+    end
+
+
+// ==== è¾“å‡ºå¯„å­˜å™¨ç»„ï¼ˆå¯¹åº”å›¾ä¸­Output Regæ¨¡å—ï¼‰
 //-----------------------------------------------------------------
-logic [DWIDTH-1:0] input_reg [8:0];  // ÊäÈë¾ØÕóÔªËØ»º´æ¼Ä´æÆ÷
 
-// Êı¾İ¼ÓÔØ¿ØÖÆ£¨µ±²Ù×÷ÂëÎª0x1Ê±¼ÓÔØÊäÈë¾ØÕó£©
-always_ff @(posedge clk) begin
-    if(mibus_cmd[15:12] == 4'h1)  // ¼ÓÔØÖ¸Áî£¨²Ù×÷Âë4'h1£©
-        input_reg <= mtbus_ch;     // ´ÓMTBus½ÓÊÕÔ­Ê¼¾ØÕóÊı¾İ
-end
-
-// ==== ÖĞ¼ä½á¹û¼Ä´æÆ÷£¨¶ÔÓ¦Í¼ÖĞIntermediate Result Reg£©
-//-----------------------------------------------------------------
-logic [DWIDTH-1:0] a, b, c, d, e, f, x, y, z;  // ¾ØÕóÔËËãÖĞ¼ä±äÁ¿
-
-// ==== CEUÄ£¿éÊµÀı»¯£¨°´Á÷³ÌÍ¼´¦ÀíË³Ğò£©
-//-----------------------------------------------------------------
-// ================== µÚÒ»¼ÆËã½×¶Î£º»ù´¡³Ë·¨ÔËËã ==================
-// ¼ÆËãa = H[0][0] * P[0][0]£¨¼ÙÉèHÎªÏµÊı¾ØÕó£¬PÎªÊäÈë¾ØÕó£©
-CEU_a u_CEU_a (
-    .clk        (clk),
-    .in1        (input_reg[0]),  // ¾ØÕóÔªËØH[0][0]£¨µÚÒ»ĞĞµÚÒ»ÁĞ£©
-    .in2        (input_reg[4]),  // ¾ØÕóÔªËØP[0][0]£¨¼ÙÉèÎªĞ­·½²î¾ØÕóÔªËØ£©
-    .out        (a)              // Êä³öÖĞ¼ä³Ë»ı½á¹ûa
-);
-
-// ¼ÆËãx = H[0][1] * P[1][0]£¨Ê¾Àı£ºµÚ¶şÁĞµÚÒ»ĞĞÔªËØ³Ë»ı£©
-CEU_d u_CEU_d (
-    .clk        (clk),
-    .in1        (input_reg[1]),  // ¾ØÕóÔªËØH[0][1]
-    .in2        (input_reg[3]),  // ¾ØÕóÔªËØP[1][0]
-    .out        (x)              // Êä³öÖĞ¼ä³Ë»ı½á¹ûx
-);
-CEU_x u_CEU_x (
-    .clk        (clk),
-    .in1        (input_reg[1]),  // ¾ØÕóÔªËØH[0][1]
-    .in2        (input_reg[3]),  // ¾ØÕóÔªËØP[1][0]
-    .out        (x)              // Êä³öÖĞ¼ä³Ë»ı½á¹ûx
-);
-// ... ÆäËûCEUÄ£¿éÊµÀı»¯£¨b/c/d/e/fµÈÖĞ¼ä±äÁ¿¼ÆËã£¬°´¾ØÕóÕ¹¿ªÊ½²¹³ä£©
-
-// ================== µÚ¶ş¼ÆËã½×¶Î£ºĞĞÁĞÊ½¼ÆËã ==================
-// ¼ÆËã¦Á = a*d - x?£¨ĞĞÁĞÊ½ºËĞÄÏî£©
-CEU_alpha u_CEU_alpha (
-    .clk        (clk),
-    .in1        (a),             // µÚÒ»ĞĞµÚÒ»ÁĞ³Ë»ıÏî
-    .in2        (d),             // µÚ¶şĞĞµÚ¶şÁĞ³Ë»ıÏî
-    .in3        (x),             // ½»²æÏîÆ½·½
-    .out        (alpha)          // Êä³öĞĞÁĞÊ½Öµ¦Á
-);
-
-// ================== µÚÈı¼ÆËã½×¶Î£ºÄæ¾ØÕóÔªËØ¼ÆËã ==================
-// ¼ÆËã1/¦Á£¨ĞĞÁĞÊ½µ¹Êı£©
-CEU_division u_CEU_div (
-    .clk        (clk),
-    .numerator  ({b, e, y}),     // ·Ö×ÓÏî£¨×éºÏÖĞ¼ä½á¹û£©
-    .denominator(alpha),         // ·ÖÄ¸Ïî£¨ĞĞÁĞÊ½Öµ£©
-    .quotient   (inv_alpha)      // Êä³öµ¹Êı½á¹û1/¦Á
-);
-
-// ================== Êä³ö½×¶Î£ºÄæ¾ØÕóÔªËØºÏ³É ==================
-// ¼ÆËãÄæ¾ØÕóµÚÒ»ĞĞµÚÒ»ÁĞÔªËØ£º(d*e - y?)/¦Á
-always_ff @(posedge clk) begin
-    result_reg[0] <= inv_alpha * (d*e - y*y);  // ¶ÔÓ¦Í¼ÖĞ×îÖÕ¾ØÕóÔªËØ¼ÆËã
-    result_reg[1] <= inv_alpha * (x*y - b*d);   // ½»²æÏîĞŞÕı£¨°´¾ØÕóÇóÄæ¹«Ê½£©
-    // ... ÆäËû¾ØÕóÔªËØ¼ÆËã£¨°´3x3¾ØÕóÄæÔËËã¹«Ê½²¹³ä£©
-end
-
-// ==== Êä³ö¼Ä´æÆ÷×é£¨¶ÔÓ¦Í¼ÖĞOutput RegÄ£¿é£©
-//-----------------------------------------------------------------
-logic [DWIDTH-1:0] result_reg [8:0];  // Êä³ö½á¹û»º´æ¼Ä´æÆ÷
-assign result_ch = result_reg;         // Çı¶¯Êä³ö×ÜÏß
+assign inv_max = result_reg;         // é©±åŠ¨è¾“å‡ºæ€»çº¿
 
 endmodule

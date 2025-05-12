@@ -4,7 +4,7 @@
 
 set TIME_start [clock seconds] 
 namespace eval ::optrace {
-  variable script "D:/Main_Files/postgraduate/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.runs/synth_1/KalmanFilterTop.tcl"
+  variable script "D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.runs/synth_1/KalmanFilterTop.tcl"
   variable category "vivado_synth"
 }
 
@@ -76,15 +76,64 @@ create_project -in_memory -part xc7vx485tffg1157-1
 set_param project.singleFileAddWarning.threshold 0
 set_param project.compositeFile.enableAutoGeneration 0
 set_param synth.vivado.isSynthRun true
-set_property webtalk.parent_dir D:/Main_Files/postgraduate/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.cache/wt [current_project]
-set_property parent.project_path D:/Main_Files/postgraduate/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.xpr [current_project]
+set_msg_config -source 4 -id {IP_Flow 19-2162} -severity warning -new_severity info
+set_property webtalk.parent_dir D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.cache/wt [current_project]
+set_property parent.project_path D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.xpr [current_project]
 set_property default_lib xil_defaultlib [current_project]
 set_property target_language Verilog [current_project]
-set_property ip_output_repo d:/Main_Files/postgraduate/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.cache/ip [current_project]
+set_property ip_output_repo d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.cache/ip [current_project]
 set_property ip_cache_permissions {read write} [current_project]
 OPTRACE "Creating in-memory project" END { }
 OPTRACE "Adding files" START { }
-read_verilog -library xil_defaultlib -sv D:/Main_Files/postgraduate/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/kalman_acc_top.sv
+read_verilog -library xil_defaultlib -sv {
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CEU_a.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CEU_alpha.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CEU_d.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CEU_division.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CEU_x.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi11.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi12.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi13.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi14.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi21.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi22.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi23.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi24.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi31.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi32.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi33.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi34.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi41.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi42.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi43.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi44.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CovarianceUpdate.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/DelayUnit.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/KF_ControlUnit.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/KalmanGainCalculator.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/MatrixInverseUnit.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/MatrixTransBridge.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/ProcessingElement.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/StatePredictor.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/StateUpdate.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/SystolicArray.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/fp_adder.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/fp_multiplier.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/fp_suber.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/kalman_acc_top.sv
+}
+read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_mul/floating_point_mul.xci
+set_property used_in_implementation false [get_files -all d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.gen/sources_1/ip/floating_point_mul/floating_point_mul_ooc.xdc]
+
+read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_sub/floating_point_sub.xci
+set_property used_in_implementation false [get_files -all d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.gen/sources_1/ip/floating_point_sub/floating_point_sub_ooc.xdc]
+
+read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_add/floating_point_add.xci
+set_property used_in_implementation false [get_files -all d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.gen/sources_1/ip/floating_point_add/floating_point_add_ooc.xdc]
+
+read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_div/floating_point_div.xci
+set_property used_in_implementation false [get_files -all d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.gen/sources_1/ip/floating_point_div/floating_point_div_ooc.xdc]
+
 OPTRACE "Adding files" END { }
 # Mark all dcp files as not used in implementation to prevent them from being
 # stitched into the results of this synthesis run. Any black boxes in the
@@ -100,6 +149,9 @@ close [open __synthesis_is_running__ w]
 OPTRACE "synth_design" START { }
 synth_design -top KalmanFilterTop -part xc7vx485tffg1157-1
 OPTRACE "synth_design" END { }
+if { [get_msg_config -count -severity {CRITICAL WARNING}] > 0 } {
+ send_msg_id runtcl-6 info "Synthesis results are not added to the cache due to CRITICAL_WARNING"
+}
 
 
 OPTRACE "write_checkpoint" START { CHECKPOINT }

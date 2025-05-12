@@ -26,68 +26,72 @@ module StatePredictor #(
     input  logic             clk,
     input  logic             rst_n,
     
-    // ÏµÍ³ÊäÈë½Ó¿Ú
-    input  logic [VEC_WIDTH-1:0] X_k_k_1,     // ÉÏÒ»Ê±¿Ì×´Ì¬¹À¼Æ
-    input  logic [VEC_WIDTH-1:0] Kk,          // KalmanÔöÒæ
-    input  logic [MAT_DIM*VEC_WIDTH-1:0] P_prev, // Ğ­·½²î¾ØÕó
+    // ç³»ç»Ÿè¾“å…¥æ¥å£
+    input  logic [VEC_WIDTH-1:0] X_kk1 [MAT_DIM-1:0],     // ä¸Šä¸€æ—¶åˆ»çŠ¶æ€ä¼°è®¡
+    input  logic [VEC_WIDTH-1:0] K_k [12-1:0][12-1:0],          // Kalmanå¢ç›Š
     
-    // ×ÜÏß½Ó¿Ú
-    output MIBus_if          predict_bus,    // Ô¤²â×ÜÏß
-    input  FIFO_if           fifo_in,        // ¹Û²âÊı¾İÊäÈë
+    input logic [VEC_WIDTH-1:0] Z_k [6-1:0],          // è§‚æµ‹å€¼
     
-    // ÏµÍ³Êä³ö
-    output logic [VEC_WIDTH-1:0] Z_k         // ×îÖÕÔ¤²âÊä³ö
+    // ç³»ç»Ÿè¾“å‡º
+    output  logic [VEC_WIDTH-1:0] X_kk [MAT_DIM-1:0]    // ä¸‹ä¸€æ—¶åˆ»çŠ¶æ€ä¼°è®¡
 );
+logic [VEC_WIDTH-1:0] HX [6-1:0];
+logic [VEC_WIDTH-1:0] Z_HX [6-1:0]; // ä¸Šä¸€æ—¶åˆ»çŠ¶æ€åæ–¹å·®çŸ©é˜µ
+generate
+    for (genvar i = 0; i < 6; i++) begin : gen_HX
+        assign HX[i] = X_kk1[i];
+        // output declaration of module fp_suber
 
-// ==== ºËĞÄ´¦ÀíÍ¨µÀ½á¹¹
-//-----------------------------------------------------------------
-logic [VEC_WIDTH-1:0] channel_reg [3:0];
-logic [MAT_DIM*VEC_WIDTH-1:0] matrix_bus;
+        fp_suber u_fp_suber(
+            .clk    	(clk     ),
+            .a      	(Z_k[i] ),
+            .b      	(HX[i] ),
+            .result 	(Z_HX[i] ) 
+        );
+        
+    end
 
-// ³õÊ¼»¯Ä£¿é£¨¶ÔÓ¦Í¼ÖĞInitÄ£¿é£©
-InitBlock #(.WIDTH(VEC_WIDTH)) u_init (
+endgenerate
+
+
+logic [64-1:0] KKmatrix [0:12-1][0:12-1];
+logic [64-1:0] ZHXmatrix [0:12-1][0:12-1];
+logic [64-1:0] Xkkmatrix [0:12-1][0:12-1];
+generate//å¡«å……ä¸º12x12çŸ©é˜µ
+    for (genvar i = 0; i < 12; i++) begin : row_gen
+        for (genvar j = 0; j < 12; j++) begin : col_gen
+            always_ff @(posedge clk or negedge rst_n) begin
+                if (!rst_n) begin
+                    KKmatrix[i][j] <= 64'h0; // å¤ä½æ—¶æ¸…é›¶
+                    ZHXmatrix[i][j] <= 64'h0; // å¤ä½æ—¶æ¸…é›¶
+                end else  begin
+                    KKmatrix[i][j] <= (j < 6) ? K_k[i][j] : 64'h0;
+                    ZHXmatrix[i][j] <= (j < 6&&i == 0) ? Z_HX[i] : 64'h0;
+                end
+            end
+        end
+    end
+endgenerate
+
+SystolicArray #(
+    .DWIDTH(64),
+    .ARRAY_SIZE(3)
+) u_systolic (
     .clk(clk),
     .rst_n(rst_n),
-    .initial_data(P_prev),
-    .bus_out(matrix_bus[MAT_DIM*VEC_WIDTH-1:0])
+    .a_row(KKmatrix),   // æ¥è‡ªFIFOçš„P_predicted
+    .b_col(ZHXmatrix),      // CEUè®¡ç®—çš„é€†çŸ©é˜µ
+    .load_en(ceu_complete), // CEUå®ŒæˆååŠ è½½
+    .enb_1(ceu_valid_in), // CEUæœ‰æ•ˆä¿¡å·
+    .enb_2_6(cmu_valid_in), // CMUæœ‰æ•ˆä¿¡å·
+    .enb_7_12(ceu_complete), // CEUå®Œæˆä¿¡å·
+    .c_out(Xkkmatrix)
 );
 
-// Ö÷´¦ÀíÍ¨µÀ£¨¶ÔÓ¦Í¼ÖĞºÚÉ«Í¨µÀÄ£¿é£©
-ChannelProcessor #(.WIDTH(VEC_WIDTH)) u_channel (
-    .clk(clk),
-    .data_in({X_k_k_1, matrix_bus}),
-    .neg_en(predict_bus.ctrl_flag),  // ×ÜÏß¿ØÖÆĞÅºÅ
-    .data_out(channel_reg[0])
-);
-
-// ³Ë·¨¶ÓÁĞ£¨¶ÔÓ¦Í¼ÖĞMUXÄ£¿é£©
-MatrixMultiplier u_mux (
-    .clk(clk),
-    .operand_a(channel_reg[0]),
-    .operand_b(Kk),
-    .result(channel_reg[1])
-);
-
-// µİ¹é·´À¡Í¨µÀ£¨¶ÔÓ¦Í¼ÖĞÂÌÉ«Í¨µÀ£©
-RecursiveChannel u_feedback (
-    .clk(clk),
-    .data_in(channel_reg[1]),
-    .fifo_data(fifo_in.data),
-    .data_out(channel_reg[2])
-);
-
-// ×îÖÕÊä³öºÏ³É
-assign Z_k = channel_reg[3];
-
-// ==== Ê±Ğò¿ØÖÆ¿ØÖÆ
-//-----------------------------------------------------------------
-always_ff @(posedge clk) begin
-    if(!rst_n) begin
-        channel_reg <= '{default:0};
-    end else begin
-        // Èı¼¶Á÷Ë®Ïß¼Ä´æ
-        channel_reg[3] <= channel_reg[2] + predict_bus.adjust_term;  // ×ÜÏßĞ£ÕıÏî
+generate//å¡«å……ä¸º12x12çŸ©é˜µ
+    for (genvar i = 0; i < 12; i++) begin 
+       assign X_kk[i] = Xkkmatrix[i][0];
     end
-end
+endgenerate
 
 endmodule
