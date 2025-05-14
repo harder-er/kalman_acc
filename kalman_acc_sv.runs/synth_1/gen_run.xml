@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<GenRun Id="synth_1" LaunchPart="xc7vx485tffg1157-1" LaunchTime="1747010377">
+<GenRun Id="synth_1" LaunchPart="xc7vx485tffg1157-1" LaunchTime="1747204666">
   <File Type="PA-TCL" Name="KalmanFilterTop.tcl"/>
   <File Type="RDS-PROPCONSTRS" Name="KalmanFilterTop_drc_synth.rpt"/>
   <File Type="REPORTS-TCL" Name="KalmanFilterTop_reports.tcl"/>
@@ -11,6 +11,34 @@
   <File Type="VDS-TIMING-PB" Name="KalmanFilterTop_timing_summary_synth.pb"/>
   <FileSet Name="sources" Type="DesignSrcs" RelSrcDir="$PSRCDIR/sources_1" RelGenDir="$PGENDIR/sources_1">
     <Filter Type="Srcs"/>
+    <File Path="$PSRCDIR/sources_1/ip/floating_point_sub/floating_point_sub.xci">
+      <FileInfo>
+        <Attr Name="UsedIn" Val="synthesis"/>
+        <Attr Name="UsedIn" Val="implementation"/>
+        <Attr Name="UsedIn" Val="simulation"/>
+      </FileInfo>
+    </File>
+    <File Path="$PSRCDIR/sources_1/ip/floating_point_add/floating_point_add.xci">
+      <FileInfo>
+        <Attr Name="UsedIn" Val="synthesis"/>
+        <Attr Name="UsedIn" Val="implementation"/>
+        <Attr Name="UsedIn" Val="simulation"/>
+      </FileInfo>
+    </File>
+    <File Path="$PSRCDIR/sources_1/ip/floating_point_mul/floating_point_mul.xci">
+      <FileInfo>
+        <Attr Name="UsedIn" Val="synthesis"/>
+        <Attr Name="UsedIn" Val="implementation"/>
+        <Attr Name="UsedIn" Val="simulation"/>
+      </FileInfo>
+    </File>
+    <File Path="$PSRCDIR/sources_1/ip/floating_point_div/floating_point_div.xci">
+      <FileInfo>
+        <Attr Name="UsedIn" Val="synthesis"/>
+        <Attr Name="UsedIn" Val="implementation"/>
+        <Attr Name="UsedIn" Val="simulation"/>
+      </FileInfo>
+    </File>
     <File Path="$PSRCDIR/sources_1/new/CEU_a.sv">
       <FileInfo>
         <Attr Name="UsedIn" Val="synthesis"/>
@@ -172,6 +200,13 @@
         <Attr Name="UsedIn" Val="simulation"/>
       </FileInfo>
     </File>
+    <File Path="$PSRCDIR/sources_1/new/F_make.sv">
+      <FileInfo>
+        <Attr Name="UsedIn" Val="synthesis"/>
+        <Attr Name="UsedIn" Val="implementation"/>
+        <Attr Name="UsedIn" Val="simulation"/>
+      </FileInfo>
+    </File>
     <File Path="$PSRCDIR/sources_1/new/KF_ControlUnit.sv">
       <FileInfo>
         <Attr Name="UsedIn" Val="synthesis"/>
@@ -286,8 +321,4 @@
     <StratHandle Name="Vivado Synthesis Defaults" Flow="Vivado Synthesis 2020"/>
     <Step Id="synth_design"/>
   </Strategy>
-  <BlockFileSet Type="BlockSrcs" Name="floating_point_mul"/>
-  <BlockFileSet Type="BlockSrcs" Name="floating_point_sub"/>
-  <BlockFileSet Type="BlockSrcs" Name="floating_point_div"/>
-  <BlockFileSet Type="BlockSrcs" Name="floating_point_add"/>
 </GenRun>

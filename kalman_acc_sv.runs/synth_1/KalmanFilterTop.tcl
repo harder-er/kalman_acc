@@ -109,6 +109,7 @@ read_verilog -library xil_defaultlib -sv {
   D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CMU_PHi44.sv
   D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/CovarianceUpdate.sv
   D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/DelayUnit.sv
+  D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/F_make.sv
   D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/KF_ControlUnit.sv
   D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/KalmanGainCalculator.sv
   D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/MatrixInverseUnit.sv
@@ -122,17 +123,13 @@ read_verilog -library xil_defaultlib -sv {
   D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/fp_suber.sv
   D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/new/kalman_acc_top.sv
 }
-read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_mul/floating_point_mul.xci
-set_property used_in_implementation false [get_files -all d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.gen/sources_1/ip/floating_point_mul/floating_point_mul_ooc.xdc]
-
 read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_sub/floating_point_sub.xci
-set_property used_in_implementation false [get_files -all d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.gen/sources_1/ip/floating_point_sub/floating_point_sub_ooc.xdc]
 
 read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_add/floating_point_add.xci
-set_property used_in_implementation false [get_files -all d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.gen/sources_1/ip/floating_point_add/floating_point_add_ooc.xdc]
+
+read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_mul/floating_point_mul.xci
 
 read_ip -quiet D:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.srcs/sources_1/ip/floating_point_div/floating_point_div.xci
-set_property used_in_implementation false [get_files -all d:/zgh/direction/kalman_rtl/kalman_acc_sv/kalman_acc_sv.gen/sources_1/ip/floating_point_div/floating_point_div_ooc.xdc]
 
 OPTRACE "Adding files" END { }
 # Mark all dcp files as not used in implementation to prevent them from being
@@ -143,6 +140,8 @@ OPTRACE "Adding files" END { }
 foreach dcp [get_files -quiet -all -filter file_type=="Design\ Checkpoint"] {
   set_property used_in_implementation false $dcp
 }
+read_xdc dont_touch.xdc
+set_property used_in_implementation false [get_files dont_touch.xdc]
 set_param ips.enableIPCacheLiteLoad 1
 close [open __synthesis_is_running__ w]
 

@@ -27,54 +27,55 @@ module SystolicArray #(
     input  logic             clk,
     input  logic             rst_n,
     
-    // ¾ØÕóÊäÈë½Ó¿Ú
+    // çŸ©é˜µè¾“å…¥æ¥å£
     input  logic [DWIDTH-1:0] a_row [0:MAX_SIZE-1],
     input  logic [DWIDTH-1:0] b_col [0:MAX_SIZE-1],
     input  logic             load_en,
     
-    // ÖØ¹¹¿ØÖÆĞÅºÅ
+    // é‡æ„æ§åˆ¶ä¿¡å·
     input  logic             enb_1,
     input  logic             enb_2_6,
     input  logic             enb_7_12,
     
-    // ½á¹ûÊä³ö
-    output logic [DWIDTH-1:0] c_out [0:MAX_SIZE-1][0:MAX_SIZE-1]
+    // ç»“æœè¾“å‡º
+    output logic [DWIDTH-1:0] c_out [0:MAX_SIZE-1][0:MAX_SIZE-1],
+    output logic             cal_finish
 );
 
-// ¨€¨€¨€¨€¨€ ÊäÈë¼Ä´æÆ÷×é
+// â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ è¾“å…¥å¯„å­˜å™¨ç»„
 //-----------------------------------------------------------------
 logic [DWIDTH-1:0] a_reg [0:MAX_SIZE-1][0:MAX_SIZE-1];
 logic [DWIDTH-1:0] b_reg [0:MAX_SIZE-1][0:MAX_SIZE-1];
 
 always_ff @(posedge clk) begin
     if(load_en) begin
-        // °´ĞĞ¼ÓÔØ¾ØÕóA
+        // æŒ‰è¡ŒåŠ è½½çŸ©é˜µA
         for(int i=0; i<MAX_SIZE; i++) begin
-            a_reg[i][0] <= a_row[i];  // ×ó²à¼Ä´æÆ÷ÁĞ
+            a_reg[i][0] <= a_row[i];  // å·¦ä¾§å¯„å­˜å™¨åˆ—
         end
         
-        // °´ÁĞ¼ÓÔØ¾ØÕóB 
+        // æŒ‰åˆ—åŠ è½½çŸ©é˜µB 
         for(int j=0; j<MAX_SIZE; j++) begin
-            b_reg[0][j] <= b_col[j];  // ¶¥²¿¼Ä´æÆ÷ĞĞ
+            b_reg[0][j] <= b_col[j];  // é¡¶éƒ¨å¯„å­˜å™¨è¡Œ
         end
     end
 end
 
-// ¨€¨€¨€¨€¨€ ¿ÉÖØ¹¹½âÂëÆ÷
+// â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ å¯é‡æ„è§£ç å™¨
 //-----------------------------------------------------------------
 logic [MAX_SIZE-1:0] row_enable;
 
 always_comb begin
     row_enable = '0;
     case({enb_7_12, enb_2_6, enb_1})
-        3'b001: row_enable[0] = 1'b1;        // µÚ1ĞĞ
-        3'b010: row_enable[5:1] = '1;        // µÚ2-6ĞĞ
-        3'b100: row_enable[11:6] = '1;       // µÚ7-12ĞĞ
+        3'b001: row_enable[0] = 1'b1;        // ç¬¬1è¡Œ
+        3'b010: row_enable[5:1] = '1;        // ç¬¬2-6è¡Œ
+        3'b100: row_enable[11:6] = '1;       // ç¬¬7-12è¡Œ
         default: row_enable = '0;
     endcase
 end
 
-// ¨€¨€¨€¨€¨€ ÑÓ³Ù¼ÆÊıÆ÷ÍøÂç
+// â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ å»¶è¿Ÿè®¡æ•°å™¨ç½‘ç»œ
 //-----------------------------------------------------------------
 logic [3:0] delay_counter [0:MAX_SIZE-1][0:MAX_SIZE-1];
 
@@ -91,7 +92,7 @@ for(genvar i=0; i<MAX_SIZE; i++) begin
 end
 endgenerate
 
-// ¨€¨€¨€¨€¨€ PE´¦Àíµ¥ÔªÕóÁĞ
+// â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ PEå¤„ç†å•å…ƒé˜µåˆ—
 //-----------------------------------------------------------------
 logic [DWIDTH-1:0] a_data [0:MAX_SIZE][0:MAX_SIZE];
 logic [DWIDTH-1:0] b_data [0:MAX_SIZE][0:MAX_SIZE];
@@ -106,7 +107,7 @@ for(genvar i=0; i<MAX_SIZE; i++) begin
             .en(row_enable[i]),
             .delay(delay_counter[i][j]),
             
-            // Êı¾İÍ¨Â·
+            // æ•°æ®é€šè·¯
             .a_in(a_data[i][j]),
             .b_in(b_data[i][j]),
             .c_in((i==0 && j==0) ? '0 : c_data[i-1][j]),
@@ -116,12 +117,17 @@ for(genvar i=0; i<MAX_SIZE; i++) begin
             .c_out(c_data[i][j])
         );
         
-        // ±ß½çÁ¬½Ó
+        // è¾¹ç•Œè¿æ¥
         if(j == 0) assign a_data[i][j] = a_reg[i][0];
         if(i == 0) assign b_data[i][j] = b_reg[0][j];
         
-        // ½á¹ûÊä³ö
+        // ç»“æœè¾“å‡º
         assign c_out[i][j] = c_data[i][j];
+        if (i == MAX_SIZE-1 && j == MAX_SIZE-1) begin
+            assign cal_finish = 1'b1; // è®¡ç®—å®Œæˆä¿¡å·
+        end else begin
+            assign cal_finish = 1'b0; // è®¡ç®—æœªå®Œæˆä¿¡å·
+        end
     end
 end
 endgenerate

@@ -19,17 +19,20 @@ module KalmanFilterTop #(
 
 
     // 系统模型参数
-    input  logic [64:0]                  Q_k    [STATE_DIM-1:0][STATE_DIM-1:0],
-    input  logic [64:0]                  R_k    [MEASURE_DIM-1:0][MEASURE_DIM-1:0],
+    input  logic [64:0]                  Q_k    [STATE_DIM-1:0][STATE_DIM-1:0]      ,
+    input  logic [64:0]                  R_k    [MEASURE_DIM-1:0][MEASURE_DIM-1:0]  ,
 
     // 实时数据接口
-    input  logic [64:0]                  Z_k    [MEASURE_DIM-1:0],
-    input  logic [64:0]                  X_00   [STATE_DIM-1:0],
-    input  logic [64:0]                  P_00   [STATE_DIM-1:0][STATE_DIM-1:0],
+    input  logic [64:0]                  Z_k    [MEASURE_DIM-1:0]                   , // 观测值 
+    input  logic                         En_MDI,
+    input  logic [64:0]                  X_00   [STATE_DIM-1:0]                     , // 初始状态      
+    input  logic [64:0]                  P_00   [STATE_DIM-1:0][STATE_DIM-1:0]      ,
 
     // 滤波结果输出
-    output logic [31:0]                  X_kkout  [STATE_DIM-1:0],
-    output logic [31:0]                  P_kkout  [STATE_DIM-1:0][STATE_DIM-1:0]
+    output logic [31:0]                  X_kkout  [STATE_DIM-1:0]                   , // 估计状态
+    output logic [31:0]                  P_kkout  [STATE_DIM-1:0][STATE_DIM-1:0]    ,
+
+    output logic                         filter_done
 
 );
 
@@ -51,34 +54,42 @@ module KalmanFilterTop #(
     logic [63:0]                         F        [STATE_DIM-1:0][STATE_DIM-1:0]; // K_k
 
 
-    logic                                SP_Start, CKG_Start, SCU_Start;
-    // 各子模块完成标志
-    logic                               sp_done, cp_done, kgc_done, su_done, cu_done;
-    logic                               Init_Valid;
-    logic                               SP_Done;
-    logic                               CKG_Done;
-    logic                               SCU_Done;
-    logic                               MDI_Valid;
-    logic                               SCO_Valid;
+    logic       Init_Valid    ;
+    logic       SP_Done       ;
+    logic       SCU_Done_s    ;
+    logic       SCU_Done_p    ;
+    logic       CKG_Done      ;
+    logic       SCO_Valid     ;
+    logic       MDI_Valid     ;
+    logic       End_valid     ;
+    logic       en_init       ;
+    logic       en_sp         ;
+    logic       en_ckg        ;
+    logic       en_scu        ;
+    logic       en_sco        ;
+    logic       finish        ;
     // -------------------------------------------------
     // 控制单元
     // -------------------------------------------------
-    KF_ControlUnit u_ControlUnit (
-        .clk        (   clk             ),
-        .rst        (   rst_n           ),
-        .Init_Valid (   Init_Valid      ),
-        .SP_Valid   (   SP_Start        ),
-        .SP_Done    (   sp_done         ),
-        .CKG_Valid  (   CKG_Start       ),
-        .CKG_Done   (   kgc_done        ),
-        .SCU_Valid  (   SCU_Start       ),
-        .SCU_Done   (   su_done         ),
-        .MDI_Valid  (   MDI_Valid       ),
-        .SCO_Valid  (   SCO_Valid       ),
-        .SP_Start   (   SP_Start        ),
-        .CKG_Start  (   CKG_Start       ),
-        .SCU_Start  (   SCU_Start       )
-    );
+    KF_ControlUnit u_KF_ControlUnit(
+    .clk        (  clk        ),
+    .rst_n      (  rst_n      ),
+    .Init_Valid (  Init_Valid ),
+    .SP_Done    (  SP_Done    ),
+    .SCU_Done_s (  SCU_Done_s   ),
+    .SCU_Done_p (  SCU_Done_p   ),
+    .CKG_Done   (  CKG_Done   ),
+    .SCO_Valid  (  SCO_Valid  ),
+    .MDI_Valid  (  MDI_Valid  ),
+    .End_valid  (  End_valid  ),
+    .en_init    (  en_init    ),
+    .en_sp      (  en_sp      ),
+    .en_ckg     (  en_ckg     ),
+    .en_scu     (  en_scu     ),
+    .en_sco     (  en_sco     ),
+    .finish     (  finish     )
+);
+
 
     Fmake u_Fmake (
         .clk        ( clk    ),
@@ -90,32 +101,30 @@ module KalmanFilterTop #(
     // 状态预测
     // -------------------------------------------------
     StateUpdate u_StateUpdator (
-        .clk            ( clk       ),
-        .rst_n          ( rst_n     ),
-        .F              ( F         ),
-        .X_kk           ( X_kk      ),
-        .X_k1k          ( X_k1k     ),
-        .fifo_valid     ( sp_done   )
+        .clk            (clk        ),
+        .rst_n          (rst_n      ),
+        .F              (F          ),
+        .X_kk           (X_kk       ),
+        .X_k1k          (X_k1k      ),
+        .CKG_Done       (en_ckg     ),
+        .MDI_Valid      (en_mdi     ),
+        .SCU_Done       (SCU_Done_s ) 
     );
 
 
-    assign SP_Done = sp_done && cp_done;
-
-    
     KalmanGainCalculator #(
         .DWIDTH    (64)
     ) u_KalmanGainCalc (
-        .clk             (clk),
-        .rst_n           (rst_n),
-        .Q_k             (Q_k),
-        .P_k1k1          (P_k1k1),
-        .CKG_start       (CKG_Start),
-        .R_k              (R_k),
-        .K_k              (K_k),
-        .data_valid_out  (kgc_done)
+        .clk             ( clk       ),
+        .rst_n           ( rst_n     ),
+        .Q_k             ( Q_k       ),
+        .P_k1k1          ( P_k1k1    ),
+        .R_k             ( R_k       ),
+        .K_k             ( K_k       ),
+        .SP_Done         ( en_sp     ),
+        .CKG_Done        ( CKG_Done  )  
     );
 
-    assign CKG_Done = kgc_done;
 
     // -------------------------------------------------
     // 状态更新
@@ -130,7 +139,8 @@ module KalmanFilterTop #(
         .Z_k           ( Z_k        ),
         .X_kk1         ( X_kk1      ),
         .X_kk          ( X_kk       ),
-        .done          ( su_done    )
+        .Init_Valid    ( en_init    ),
+        .SP_DONE       ( SP_Done    )
     );
 
     // -------------------------------------------------
@@ -142,42 +152,37 @@ module KalmanFilterTop #(
     ) u_CovUpdate (
         .clk           (clk         ),
         .rst_n         (rst_n       ),
-        .K_k            (K_k      ),
-        .R_k            (R_k          ),
-        .P_kk1          (P_kk1  ),
+        .K_k           (K_k         ),
+        .R_k           (R_k         ),
+        .P_kk1         (P_kk1       ),
         .P_kk          (P_kk        ),
-        .valid_out     (cu_done     )
+        .CKG_Done      (en_ckg      ),
+        .SCU_Done      (SCU_Done    ) 
     );
 
-    assign SCU_Done = cu_done;
-
-    // -------------------------------------------------
-    // 时序对齐单元
-    // -------------------------------------------------
     DelayUnit #(
-        .DELAY_CYCLES(2),
+        .DELAY_CYCLES(1),
         .ROWS        (12),
         .COLS        (12),
         .DATA_WIDTH  (64)
     ) u_DelayX (
         .clk       ( clk    ),
-        .rst_n     ( rst_n),
-        .data_in   ( Xk1k),
-        .data_out  ( Xkk1)
+        .rst_n     ( rst_n  ),
+        .data_in   ( Xk1k   ),
+        .data_out  ( Xkk1   )
     );
 
     DelayUnit #(
-        .DELAY_CYCLES(2),
+        .DELAY_CYCLES(1),
         .ROWS        (12),
-        .COLS        (1),
+        .COLS        (1 ),
         .DATA_WIDTH  (64)
     ) u_DelayP (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .data_in   (P_kk),
-        .data_out  (P_k1k1)
+        .clk       ( clk        ),
+        .rst_n     ( rst_n      ),
+        .data_in   ( P_kk       ),
+        .data_out  ( P_k1k1     )
     );
-
 
 
 endmodule

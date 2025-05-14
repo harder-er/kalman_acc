@@ -24,20 +24,19 @@
 module KalmanGainCalculator #(
     parameter DWIDTH = 64
 )(
-    input  logic                   clk,
-    input  logic                   rst_n,
+    input  logic                  clk                       ,
+    input  logic                  rst_n                     ,
     
+    input  logic                  SP_Done                   ,   // 状态预测完成信号
+    output logic                  CKG_Done                  ,   // 测量更新完成信号
     // 
-    input  logic [DWIDTH-1:0]     P_k1k1 [0:12-1][0:12-1],   //p_k-1,k-1
-    input  logic                  cmu_valid_in,
-    input  logic [DWIDTH-1:0]     Q_k [0:12-1][0:12-1],  
+    input  logic [DWIDTH-1:0]     P_k1k1 [0:12-1][0:12-1]   ,   //p_k-1,k-1
+    input  logic [DWIDTH-1:0]     Q_k [0:12-1][0:12-1]      ,  
     // 
-    input  logic [DWIDTH-1:0]     R_k [0:5][0:5],  // 测量噪声矩阵
-    input  logic                   ceu_valid_in,
+    input  logic [DWIDTH-1:0]     R_k [0:5][0:5]            ,  // 测量噪声矩阵
     
     // 输出接口（OMBus）
-    output logic [DWIDTH-1:0]     K_k [0:12-1][0:12-1],  // 卡尔曼增益
-    output logic                   data_valid_out
+    output logic [DWIDTH-1:0]     K_k [0:12-1][0:12-1]  // 卡尔曼增益
 );
 
 // █████ CMU模块（矩阵计算单元）

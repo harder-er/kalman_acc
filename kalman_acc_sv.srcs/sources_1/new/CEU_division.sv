@@ -22,10 +22,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 // Module: CEU_division
 // Description:
-//   ¶ÔÍâÌá¹©Ò»¸ö³ı·¨½Ó¿Ú£¬½«×éºÏĞÅºÅ {b,e,y} ×÷Îª·Ö×Ó£¬alpha ×÷Îª·ÖÄ¸£¬
-//   Êä³öËüÃÇµÄ¸¡µãÉÌ inv_alpha = (b,e,y) / alpha¡£
+//   å¯¹å¤–æä¾›ä¸€ä¸ªé™¤æ³•æ¥å£ï¼Œå°†ç»„åˆä¿¡å· {b,e,y} ä½œä¸ºåˆ†å­ï¼Œalpha ä½œä¸ºåˆ†æ¯ï¼Œ
+//   è¾“å‡ºå®ƒä»¬çš„æµ®ç‚¹å•† inv_alpha = (b,e,y) / alphaã€‚
 // Dependencies:
-//   ÒÑÉú³ÉµÄ Xilinx/AMD Floating-Point Divider IP ºË (64-bit IEEE-754)
+//   å·²ç”Ÿæˆçš„ Xilinx/AMD Floating-Point Divider IP æ ¸ (64-bit IEEE-754)
 //
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -33,14 +33,14 @@ module CEU_division #(
     parameter DBL_WIDTH = 64           // IEEE-754 double precision
 )(
     input  logic                   clk,
-    input  logic [DBL_WIDTH-1:0]   numerator,    // ·Ö×Ó {b,e,y} ×éºÏ½á¹û
-    input  logic [DBL_WIDTH-1:0]   denominator,  // ·ÖÄ¸ alpha£¨ĞĞÁĞÊ½Öµ£©
-    output logic [DBL_WIDTH-1:0]   quotient      // Êä³ö 1/¦Á »ò·Ö×Ó£¯·ÖÄ¸
+    input  logic [DBL_WIDTH-1:0]   numerator,    // åˆ†å­ {b,e,y} ç»„åˆç»“æœ
+    input  logic [DBL_WIDTH-1:0]   denominator,  // åˆ†æ¯ alphaï¼ˆè¡Œåˆ—å¼å€¼ï¼‰
+    output logic [DBL_WIDTH-1:0]   quotient      // è¾“å‡º 1/Î± æˆ–åˆ†å­ï¼åˆ†æ¯
 );
 
-    // --- ¸¡µã³ı·¨ IP ºË ĞÅºÅÉùÃ÷ ---
-    // ÒÔÏÂĞÅºÅÃû³Æ¶ÔÓ¦ Core Generator Éú³ÉµÄ AXI-Stream ½Ó¿Ú
-    // ds335.pdf ÖĞµÄÊ¾ÀıÍ¨³£Îª£º
+    // --- æµ®ç‚¹é™¤æ³• IP æ ¸ ä¿¡å·å£°æ˜ ---
+    // ä»¥ä¸‹ä¿¡å·åç§°å¯¹åº” Core Generator ç”Ÿæˆçš„ AXI-Stream æ¥å£
+    // ds335.pdf ä¸­çš„ç¤ºä¾‹é€šå¸¸ä¸ºï¼š
     //   s_axis_dividend_tdata, s_axis_dividend_tvalid
     //   s_axis_divisor_tdata,  s_axis_divisor_tvalid
     //   m_axis_dout_tdata,     m_axis_dout_tvalid
@@ -52,25 +52,25 @@ module CEU_division #(
     logic                     div_dout_tvalid;
     logic                     div_dout_tready  = 1'b1;
 
-    // --- ¶¥²ãÊµÀı»¯ Floating-Point Divider IP ---
+    // --- é¡¶å±‚å®ä¾‹åŒ– Floating-Point Divider IP ---
     floating_point_div u_floating_point_div (
         .aclk                    (clk),
-        // ·Ö×ÓÊäÈë
+        // åˆ†å­è¾“å…¥
         .s_axis_dividend_tdata   (numerator),
         .s_axis_dividend_tvalid  (div_dividend_tvalid),
         .s_axis_dividend_tready  (div_dividend_tready),
-        // ·ÖÄ¸ÊäÈë
+        // åˆ†æ¯è¾“å…¥
         .s_axis_divisor_tdata    (denominator),
         .s_axis_divisor_tvalid   (div_divisor_tvalid),
         .s_axis_divisor_tready   (div_divisor_tready),
-        // ÉÌÊä³ö
+        // å•†è¾“å‡º
         .m_axis_dout_tdata       (quotient),
         .m_axis_dout_tvalid      (div_dout_tvalid),
         .m_axis_dout_tready      (div_dout_tready)
     );
-    // Note: ¸Ã IP ºË»áÔÚÄÚ²¿°´Á÷Ë®Ïß¼¶ÊıÑÓ³Ùºó£¬½« quotient Êä³ö²¢½«
-    // m_axis_dout_tvalid À­¸ß£¬Ö¸Ê¾Êı¾İÓĞĞ§¡£Äã¿ÉÒÔÓÃÒ»¸öĞ¡¼Ä´æÆ÷
-    // ¶ÓÁĞ»ò handshake ĞÅºÅ½øÒ»²½Í¬²½¡£
+    // Note: è¯¥ IP æ ¸ä¼šåœ¨å†…éƒ¨æŒ‰æµæ°´çº¿çº§æ•°å»¶è¿Ÿåï¼Œå°† quotient è¾“å‡ºå¹¶å°†
+    // m_axis_dout_tvalid æ‹‰é«˜ï¼ŒæŒ‡ç¤ºæ•°æ®æœ‰æ•ˆã€‚ä½ å¯ä»¥ç”¨ä¸€ä¸ªå°å¯„å­˜å™¨
+    // é˜Ÿåˆ—æˆ– handshake ä¿¡å·è¿›ä¸€æ­¥åŒæ­¥ã€‚
 
 endmodule
 

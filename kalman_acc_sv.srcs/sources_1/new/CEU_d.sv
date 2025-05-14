@@ -5,14 +5,14 @@
 // 
 // Create Date: 2025/05/06
 // Module Name: CEU_d
-// Description: ²ÎÊı»¯ CEU_d ¼ÆËãÄ£¿é£¬Ö§³ÖÍ¨µÀ d/e/f£¬Îå¼¶Á÷Ë®
+// Description: å®šä¹‰ CEU_d æ¨¡å—ï¼Œæ”¯æŒé€šè¿‡ d/e/f ç›¸å…³è®¡ç®—é€»è¾‘
 //////////////////////////////////////////////////////////////////////////////////
 module CEU_d #(
     parameter DBL_WIDTH = 64
 )(
     input  logic                   clk,
     input  logic                   rst_n,
-    // ¶¯Ì¬ÊäÈë£º°´ "def" Í¨µÀ¶ÔÓ¦µÄ ¦¨
+    // é™æ€è¾“å…¥ï¼šå¯¹åº” "def" çš„ç›¸å…³è¾“å…¥
     input  logic [DBL_WIDTH-1:0]   Theta_10_7,
     input  logic [DBL_WIDTH-1:0]   Theta_7_4,
     input  logic [DBL_WIDTH-1:0]   Theta_10_4,
@@ -21,49 +21,47 @@ module CEU_d #(
     input  logic [DBL_WIDTH-1:0]   Theta_4_4,
     input  logic [DBL_WIDTH-1:0]   Q_4_4,
     input  logic [DBL_WIDTH-1:0]   R_4_4,
-    // ¹Ì¶¨Ê±¼ä²ÎÊı
-    input  logic [DBL_WIDTH-1:0]   delta_t2,    // 2¦¤t
-    input  logic [DBL_WIDTH-1:0]   delta_t_sq,  // ¦¤t?
-    input  logic [DBL_WIDTH-1:0]   delta_t_hcu, // ?¡¤¦¤t?
-    input  logic [DBL_WIDTH-1:0]   delta_t_qr,  // ?¡¤¦¤t?
-    // Êä³ö
+    // åŠ¨æ€è¾“å…¥å‚æ•°
+    input  logic [DBL_WIDTH-1:0]   delta_t2,    // 2 å€çš„ t
+    input  logic [DBL_WIDTH-1:0]   delta_t_sq,  // t çš„å¹³æ–¹
+    input  logic [DBL_WIDTH-1:0]   delta_t_hcu, // ç‰¹å®šçš„ t ç›¸å…³å€¼
+    input  logic [DBL_WIDTH-1:0]   delta_t_qr,  // ç‰¹å®šçš„ t ç›¸å…³å€¼
+    // è¾“å‡º
     output logic [DBL_WIDTH-1:0]   d,
     output logic                   valid_out
 );
 
-    `include "fp_arithmetic.svh"
-
-    // ---------------- Á÷Ë®Ïß¼Ä´æÆ÷ ----------------
-    logic [DBL_WIDTH-1:0] stage1_A1, stage1_A2;
-    logic [DBL_WIDTH-1:0] stage2_X1, stage2_X2;
-    logic [DBL_WIDTH-1:0] stage2_X2, stage2_X4;
-    logic [DBL_WIDTH-1:0] stage3_T1, stage3_T2, stage3_T3;
-    logic [DBL_WIDTH-1:0] stage4_T4;
+    // ---------------- ä¸­é—´å˜é‡å£°æ˜ ----------------
+    logic [DBL_WIDTH-1:0] stage1_A1, stage1_X1;
+    logic [DBL_WIDTH-1:0] stage2_X2, stage2_X3;
+    logic [DBL_WIDTH-1:0] stage2_X4;
+    logic [DBL_WIDTH-1:0] stage3_T1, stage3_T2;
+    logic [DBL_WIDTH-1:0] stage4_T4, stage4_T3;
     logic [1:0]            pipe_valid;
 
-    // ×éºÏÁ¬Ïß
+    // è¾“å‡ºè®¡ç®—æ‰€éœ€
     wire [DBL_WIDTH-1:0] sum_QR;  // Q+R
 
-    // ================= ¶¥²ã×ÓÄ£¿éÊµÀı»¯ =================
-    // Stage1: A1 = ¦¨[10,7]+¦¨[7,4]£»   X1 = 2¦¤t * ¦¨[7,4]
+    // ================= æ¨¡å—åŠŸèƒ½å®ç° =================
+    // Stage1: A1 = Theta_10_7 + Theta_7_4;   X1 = 2 * t * Theta_7_4
     fp_adder      U1_add_A1 (.clk(clk), .a(Theta_10_7), .b(Theta_7_4), .result(stage1_A1));
     fp_multiplier U1_mul_X1 (.clk(clk), .a(delta_t2),   .b(Theta_7_4),   .result(stage1_X1));
 
-    // Stage2: X2 = ¦¤t? * ¦¨[8,5]£»     X3 = ?¦¤t? * A1
+    // Stage2: X2 = t çš„å¹³æ–¹ * æŸä¸ªå€¼ï¼ˆè¿™é‡Œå˜é‡å¯èƒ½æ˜¯ä¹±ç  Theta_8_5ï¼‰;     X3 = ç‰¹å®šçš„ t å€¼ * A1
     fp_multiplier U2_mul_X2 (.clk(clk), .a(delta_t_sq),  .b(Theta_8_5),   .result(stage2_X2));
     fp_multiplier U2_mul_X3 (.clk(clk), .a(delta_t_hcu), .b(stage1_A1),   .result(stage2_X3));
 
-    // Stage3: T1 = ¦¨[10,4] + X1£»     T2 = X2 + X3
+    // Stage3: T1 = Theta_10_4 + X1;     T2 = X2 + X3
     fp_adder      U3_add_T1 (.clk(clk), .a(Theta_10_4), .b(stage1_X1),   .result(stage3_T1));
     fp_adder      U3_add_T2 (.clk(clk), .a(stage2_X2), .b(stage2_X3),   .result(stage3_T2));
 
-    // Stage4: T3 = ?¦¤t?*¦¨[9,9] + (Q+R)£»  T4 = T1 + T2
+    // Stage4: T3 = ç‰¹å®šçš„ t å€¼ * æŸä¸ªå€¼ï¼ˆè¿™é‡Œå˜é‡å¯èƒ½æ˜¯ä¹±ç  Theta_9_9ï¼‰ + (Q+R);  T4 = T1 + T2
     fp_multiplier U4_mul_X4 (.clk(clk), .a(delta_t_qr), .b(Theta_9_9),  .result(stage4_T3));
     fp_adder      U4_add_QR (.clk(clk), .a(Q_9_9),     .b(R_9_9),      .result(sum_QR));
     fp_adder      U4_add_T3 (.clk(clk), .a(stage4_T3), .b(sum_QR),      .result(stage4_T3));
     fp_adder      U4_add_T4 (.clk(clk), .a(stage3_T1), .b(stage3_T2),   .result(stage4_T4));
 
-    // ================= Á÷Ë®Ïß¼Ä´æÓë¿ØÖÆ =================
+    // ================= ä¸­é—´å˜é‡èµ‹å€¼é€»è¾‘ =================
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             stage1_A1  <= '0;
@@ -76,7 +74,7 @@ module CEU_d #(
             stage4_T4  <= '0;
             pipe_valid <= 2'b00;
         end else begin
-            // Í¬²½¸÷¼¶½á¹û
+            // åŒæ­¥æ›´æ–°ä¸­é—´å˜é‡
             stage1_A1  <= stage1_A1;
             stage1_X1  <= stage1_X1;
             stage2_X2  <= stage2_X2;
@@ -85,13 +83,13 @@ module CEU_d #(
             stage3_T2  <= stage3_T2;
             stage4_T3  <= stage4_T3;
             stage4_T4  <= stage4_T4;
-            // valid ¹ÜÏß
+            // valid ä¿¡å·æ›´æ–°
             pipe_valid <= {pipe_valid[0], 1'b1};
         end
     end
 
-    // ×îÖÕÊä³ö
-    assign def       = stage4_T3 + stage4_T4; // »òÕßÔÙÓÃ fp_adder ×öÒ»´Î¼Ó·¨
+    // æœ€ç»ˆè¾“å‡ºèµ‹å€¼
+    assign d       = stage4_T3 + stage4_T4; // è¿™é‡Œå¯èƒ½éœ€è¦ä¸€ä¸ª fp_adder æ¥ç²¾ç¡®åŠ æ³•
     assign valid_out = pipe_valid[1];
 
 endmodule

@@ -20,45 +20,45 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module StateUpdate (
-    input  logic         clk,
-    input  logic         rst_n,
+    input  logic         clk                    , 
+    input  logic         rst_n                  ,
     
     // 状态转移矩阵输入
-    input  logic [63:0]  F [11:0][11:0], // 
-    input  logic [63:0]  X_kk [11:0], // 
+    input  logic [63:0]  F      [11:0][11:0]    , // 
+    input  logic [63:0]  X_kk   [11:0]          , // 
     // FIFO输出接口
-    output logic [63:0]  X_k1k [11:0],   // X_{k+1,k}输出
-    output logic         fifo_valid      // 数据有效标志
+    output logic [63:0]  X_k1k  [11:0]          ,   // X_{k+1,k}输出
+    
+    input  logic         MDI_Valid              , 
+    input  logic         CKG_Done               ,
+    output logic         SCU_Done
 );
 logic [64-1:0] matrix_out [0:12-1][0:12-1];
 generate//填充为12x12矩阵
     for (genvar i = 0; i < 12; i++) begin : row_gen
-        for (genvar j = 0; j < 12; j++) begin : col_gen
-            always_ff @(posedge clk or negedge rst_n) begin
-                if (!rst_n) begin
-                    matrix_out[i][j] <= 64'h0; // 复位时清零
-                end else  begin
-                    matrix_out[i][j] <= (j == 0) ? X_kk[i] : 64'h0;
-                end
-            end
+        for (genvar j = 0; j < 12; j++) begin : col_gen  
+            assign matrix_out[i][j] = (j == 0) ? X_kk[i] : 64'h0;
         end
     end
 endgenerate
+logic load_en;
+assign load_en = MDI_Valid & CKG_Done;
 
 logic [64-1:0] Xk1kmatrix [11:0][11:0];
 SystolicArray #(
     .DWIDTH(64),
     .ARRAY_SIZE(3)
 ) u_systolic (
-    .clk(clk),
-    .rst_n(rst_n),
-    .a_row(F),   // 来自FIFO的P_predicted
-    .b_col(matrix_out),      // CEU计算的逆矩阵
-    .load_en(ceu_complete), // CEU完成后加载
-    .enb_1(ceu_valid_in), // CEU有效信号
-    .enb_2_6(cmu_valid_in), // CMU有效信号
-    .enb_7_12(ceu_complete), // CEU完成信号
-    .c_out(Xk1kmatrix)
+    .clk        ( clk               ),
+    .rst_n      ( rst_n             ),
+    .a_row      ( F                 ),   
+    .b_col      ( matrix_out        ),      
+    .load_en    ( load_en           ), 
+    .enb_1      ( 1'b1              ), 
+    .enb_2_6    ( 1'b0              ), 
+    .enb_7_12   ( 1'b0              ), 
+    .c_out      ( Xk1kmatrix        ),
+    .cal_finish ( SCU_Done          ) 
 );
 generate
     for (genvar i = 0; i < 12; i++) begin : gen_Xk1k

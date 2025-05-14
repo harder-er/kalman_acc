@@ -19,17 +19,17 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-module fp_multiplier(
-    input  logic [DBL_WIDTH-1:0] a, b,
-    output logic [DBL_WIDTH-1:0] result
+module fp_multiplier (
+    input  logic [64-1:0] a, b,
+    output logic [64-1:0] result
 );
     // 实例化双精度乘法器IP
     floating_point_mul u1_floating_point_mul(                       //乘法器
     .aclk(clk),
     .s_axis_a_tvalid(a_tvalid),
-    .s_axis_a_tdata(a_tdata),
+    .s_axis_a_tdata(a),
     .s_axis_b_tvalid(b_tvalid),
-    .s_axis_b_tdata(b_tdata),
+    .s_axis_b_tdata(b),
     .m_axis_result_tvalid(mul_result_tvalid),
     .m_axis_result_tdata(mul_result_tdata)
 );

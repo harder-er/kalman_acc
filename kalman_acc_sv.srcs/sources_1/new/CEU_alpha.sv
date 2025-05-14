@@ -4,8 +4,8 @@
 // Engineer:
 // Create Date: 2025/04/25 17:46:27
 // Module Name: CEU_alpha
-// Description: ¼ÆËã ¦Á = in1*in2 - in3*in3£¬²ÉÓÃÁ½¼¶Á÷Ë®Ïß£¬²¢´ø valid ¹ÜÏßĞÅºÅ
-// Dependencies: fp_arithmetic.svh (ÉùÃ÷ fp_multiplier, fp_suber)
+// Description: è®¡ç®— Î± = in1*in2 - in3*in3ï¼Œé‡‡ç”¨ä¸¤çº§æµæ°´çº¿ï¼Œå¹¶å¸¦ valid ç®¡çº¿ä¿¡å·
+// Dependencies: fp_arithmetic.svh (å£°æ˜ fp_multiplier, fp_suber)
 //////////////////////////////////////////////////////////////////////////////////
 
 module CEU_alpha #(
@@ -13,17 +13,16 @@ module CEU_alpha #(
 )(
     input  logic                   clk,
     input  logic                   rst_n,
-    input  logic [DBL_WIDTH-1:0]   in1,    // ¶ÔÓ¦ a
-    input  logic [DBL_WIDTH-1:0]   in2,    // ¶ÔÓ¦ d
-    input  logic [DBL_WIDTH-1:0]   in3,    // ¶ÔÓ¦ x
-    output logic [DBL_WIDTH-1:0]   out,    // Êä³ö ¦Á
+    input  logic [DBL_WIDTH-1:0]   in1,    // å¯¹åº” a
+    input  logic [DBL_WIDTH-1:0]   in2,    // å¯¹åº” d
+    input  logic [DBL_WIDTH-1:0]   in3,    // å¯¹åº” x
+    output logic [DBL_WIDTH-1:0]   out,    // è¾“å‡º Î±
     output logic                   valid_out
 );
 
-    `include "fp_arithmetic.svh"
 
-    // ------------------- ¶¥²ã×ÓÄ£¿éºÍÁ¬Ïß -------------------
-    // Stage1 ³Ë·¨½á¹û
+    // ------------------- é¡¶å±‚å­æ¨¡å—å’Œè¿çº¿ -------------------
+    // Stage1 ä¹˜æ³•ç»“æœ
     wire [DBL_WIDTH-1:0] m1;         // in1 * in2
     wire [DBL_WIDTH-1:0] m2;         // in3 * in3
 
@@ -40,7 +39,7 @@ module CEU_alpha #(
         .result (m2)
     );
 
-    // Stage2 ²ÉÓÃ×¨ÓÃ¸¡µã¼õ·¨ IP
+    // Stage2 é‡‡ç”¨ä¸“ç”¨æµ®ç‚¹å‡æ³• IP
     wire [DBL_WIDTH-1:0] diff_m;    // m1 - m2
     fp_suber U_sub (
         .clk    (clk),
@@ -49,15 +48,15 @@ module CEU_alpha #(
         .result (diff_m)
     );
 
-    // ------------------- Á÷Ë®Ïß¼Ä´æÆ÷ -------------------
-    // Stage1 reg ±£´æ m1, m2
+    // ------------------- æµæ°´çº¿å¯„å­˜å™¨ -------------------
+    // Stage1 reg ä¿å­˜ m1, m2
     logic [DBL_WIDTH-1:0] stage1_m1, stage1_m2;
-    // Stage2 reg ±£´æ diff_m
+    // Stage2 reg ä¿å­˜ diff_m
     logic [DBL_WIDTH-1:0] stage2_diff;
-    // ¹ÜÏßÓĞĞ§ĞÅºÅ£¬¹²Á½¼¶
+    // ç®¡çº¿æœ‰æ•ˆä¿¡å·ï¼Œå…±ä¸¤çº§
     logic [1:0] valid_pipe;
 
-    // ------------------- Ê±ĞòÂß¼­ -------------------
+    // ------------------- æ—¶åºé€»è¾‘ -------------------
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             stage1_m1   <= '0;
@@ -66,13 +65,13 @@ module CEU_alpha #(
             valid_pipe  <= 2'b00;
             out         <= '0;
         end else begin
-            // ½×¶Î1½á¹û¼Ä´æ
+            // é˜¶æ®µ1ç»“æœå¯„å­˜
             stage1_m1 <= m1;
             stage1_m2 <= m2;
-            // ½×¶Î2½á¹û¼Ä´æ²¢Êä³ö
+            // é˜¶æ®µ2ç»“æœå¯„å­˜å¹¶è¾“å‡º
             stage2_diff <= diff_m;
             out         <= diff_m;
-            // ÓĞĞ§ĞÅºÅÒÆÎ»×¢Èë
+            // æœ‰æ•ˆä¿¡å·ç§»ä½æ³¨å…¥
             valid_pipe  <= { valid_pipe[0], 1'b1 };
         end
     end

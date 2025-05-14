@@ -22,18 +22,18 @@
 module StatePredictor #(
     parameter VEC_WIDTH = 64,
     parameter MAT_DIM = 12
-)(
-    input  logic             clk,
-    input  logic             rst_n,
+)( 
+    input   logic             clk                           ,
+    input   logic             rst_n                         ,
+
+    input   logic             Init_Valid                    ,     // 初始化有效信号
+    output  logic             SP_DONE                       ,     // 状态预测完成信号   
     
-    // 系统输入接口
-    input  logic [VEC_WIDTH-1:0] X_kk1 [MAT_DIM-1:0],     // 上一时刻状态估计
-    input  logic [VEC_WIDTH-1:0] K_k [12-1:0][12-1:0],          // Kalman增益
-    
-    input logic [VEC_WIDTH-1:0] Z_k [6-1:0],          // 观测值
-    
-    // 系统输出
-    output  logic [VEC_WIDTH-1:0] X_kk [MAT_DIM-1:0]    // 下一时刻状态估计
+    input   logic [VEC_WIDTH-1:0] X_kk1  [MAT_DIM-1:0]      ,     // 上一时刻状态估计
+    input   logic [VEC_WIDTH-1:0] K_k    [12-1:0][12-1:0]   ,     // Kalman增益
+    input   logic [VEC_WIDTH-1:0] Z_k    [6-1:0]            ,     // 观测值
+
+    output  logic [VEC_WIDTH-1:0] X_kk   [MAT_DIM-1:0]           // 下一时刻状态估计
 );
 logic [VEC_WIDTH-1:0] HX [6-1:0];
 logic [VEC_WIDTH-1:0] Z_HX [6-1:0]; // 上一时刻状态协方差矩阵

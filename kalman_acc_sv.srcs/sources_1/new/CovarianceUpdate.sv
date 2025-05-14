@@ -24,16 +24,17 @@ module CovarianceUpdate #(
     parameter STATE_DIM = 12,
     parameter DWIDTH = 64
 )(
-    input  logic                     clk,
-    input  logic                     rst_n,
-    // MIBus输入接口（对应图示紫色模块接口）
-    input  logic [DWIDTH-1:0]       K_k [STATE_DIM-1:0][STATE_DIM-1:0],
-    input  logic [DWIDTH-1:0]       R_k [STATE_DIM-1:0][STATE_DIM-1:0],
-    input  logic [DWIDTH-1:0]       P_kk1 [STATE_DIM-1:0][STATE_DIM-1:0],
-    input  logic                     valid_in,
+    input  logic                    clk                                     ,
+    input  logic                    rst_n                                   ,          
+    // MIBus输入接口（对应图示紫色模块接口）    
+    input  logic [DWIDTH-1:0]       K_k     [STATE_DIM-1:0][STATE_DIM-1:0]  ,
+    input  logic [DWIDTH-1:0]       R_k     [STATE_DIM-1:0][STATE_DIM-1:0]  ,
+    input  logic [DWIDTH-1:0]       P_kk1   [STATE_DIM-1:0][STATE_DIM-1:0]  ,
     // OMBus输出接口（对应图示橙色输出路径）
-    output logic [DWIDTH-1:0]       P_kk [STATE_DIM-1:0][STATE_DIM-1:0],
-    output logic                     valid_out
+    output logic [DWIDTH-1:0]       P_kk    [STATE_DIM-1:0][STATE_DIM-1:0]  ,
+
+    input  logic                    CKG_Done                                ,
+    output logic                    SCU_Done
 );
 
 // ================== 脉动阵列核心单元 ==================
@@ -42,18 +43,18 @@ logic [DWIDTH-1:0] Kkmatrix [STATE_DIM-1:0][6-1:0]; // Kk结果
 logic [DWIDTH-1:0] KkTmatrix [6-1:0][STATE_DIM-1:0]; // Kk转置结果
 // ================= 矩阵转置桥实例 =================
 MatrixTransBridge #(
-    .ROWS(12),        // 行数（网页6方案扩展）
-    .COLS(6),        // 列数
-    .DATA_WIDTH(DWIDTH) // 数据位宽（网页3双精度要求）
+    .ROWS(12),        
+    .COLS(6),       
+    .DATA_WIDTH(DWIDTH) 
 ) u_MatrixBridge (
-    .clk(clk),             // 连接系统时钟
-    .rst_n(rst_n),         // 连接复位信号
-    // 输入矩阵（来自传感器预处理）
-    .mat_in(K_k),  // 网页5所示的传感器数据阵列
+    .clk(clk),            
+    .rst_n(rst_n),         
+
+    .mat_in(K_k),  
     
-    // 输出矩阵
-    .mat_org(Kkmatrix),  // 原始矩阵（用于网页7的QR分解）
-    .mat_trans(KkTmatrix), // 转置矩阵（用于网页8的Systolic阵列）
+
+    .mat_org(Kkmatrix),  
+    .mat_trans(KkTmatrix), 
     
     // 状态信号
     .valid_out(process_done) // 网页9时序图标注的完成信号
