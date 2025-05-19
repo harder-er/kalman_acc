@@ -25,7 +25,7 @@ module ProcessingElement #(
     parameter ADD_PIPE_STAGES = 2
 )(
     input  logic             clk,
-    input  logic             rst,
+    input  logic             rst_n,
     input  logic             en,
     input  logic [DWIDTH-1:0] a_in,
     input  logic [DWIDTH-1:0] b_in,
@@ -37,47 +37,61 @@ module ProcessingElement #(
     output logic             data_ready
 );
 
-// ¨€¨€¨€¨€¨€ ×´Ì¬»ú¶¨Òå£¨·ûºÏ×´Ì¬×ªÒÆÍ¼£©
+// â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ çŠ¶æ€æœºå®šä¹‰ï¼ˆç¬¦åˆçŠ¶æ€è½¬ç§»å›¾ï¼‰
 typedef enum logic [2:0] {
     IDLE, INIT, MUL, ADD, SEND_DATA, DATA_THROUGH, END
 } fsm_state;
 
 fsm_state current_state, next_state;
 
-// ¨€¨€¨€¨€¨€ IPºËÊµÀı»¯£¨Xilinx DSP48E2Ê¾Àı£©
-multiplier_ip #(.DWIDTH(DWIDTH)) u_mult (
-    .clk(clk),
-    .ce(1'b1),
-    .a(a_reg),
-    .b(b_reg),
-    .p(partial_sum)
-);
-
-adder_ip #(
-    .DWIDTH(DWIDTH),
-    .PIPE_STAGES(ADD_PIPE_STAGES)
-) u_add (
-    .clk(clk),
-    .ce(1'b1),
-    .a(partial_sum_reg),
-    .b(sum_down),
-    .s(sum_temp)
-);
-
-// ¨€¨€¨€¨€¨€ Êı¾İ¼Ä´æÆ÷
+// â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ æ•°æ®å¯„å­˜å™¨
 logic [DWIDTH-1:0] a_reg, b_reg;
 logic [DWIDTH-1:0] partial_sum;
 logic [DWIDTH-1:0] partial_sum_reg;
 logic [DWIDTH-1:0] sum_temp;
+// output declaration of module fp_multiplier
 
-// ¨€¨€¨€¨€¨€ ¿ØÖÆĞÅºÅ
-logic mul_start, add_start;
-logic mul_finish, add_finish;
+
+
+
+// â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ æ§åˆ¶ä¿¡å·
+logic mul_start,  add_start     ;
+logic mul_finish, add_finish    ;
+
 logic data_through_finish;
-
-// ¨€¨€¨€¨€ ×´Ì¬×ªÒÆÂß¼­£¨¶ÔÓ¦×´Ì¬Í¼£©
 always_ff @(posedge clk) begin
-    if(rst) begin
+    if(!rst_n) begin
+        data_through_finish <= 1'b0;
+    end else begin
+        data_through_finish <= en;
+    end
+end
+
+
+
+fp_multiplier u_fp_multiplier(
+    .clk    	(clk            ),
+    .valid  	(mul_start      ),
+    .a      	(a_reg          ),
+    .b      	(b_reg          ),
+    .finish 	(mul_finish      ),
+    .result 	(partial_sum    )
+);
+
+
+fp_adder u_fp_adder_st(
+    .clk    	(clk                ),
+    .valid  	(add_start          ),
+    .a      	(partial_sum_reg    ),
+    .b      	(sum_down           ),
+    .finish 	(add_finish          ),
+    .result 	(sum_temp)
+);
+
+
+// â–ˆâ–ˆâ–ˆâ–ˆ çŠ¶æ€è½¬ç§»é€»è¾‘ï¼ˆå¯¹åº”çŠ¶æ€å›¾ï¼‰
+always_ff @(posedge clk) begin
+    if(!rst_n) begin
         current_state <= IDLE;
     end else begin
         current_state <= next_state;
@@ -90,7 +104,6 @@ always_comb begin
         IDLE: 
             if(en) next_state = INIT;
             else if(!en) next_state = DATA_THROUGH;
-        
         INIT: 
             next_state = MUL;
         
@@ -112,9 +125,9 @@ always_comb begin
     endcase
 end
 
-// ¨€¨€¨€¨€¨€ Êı¾İÍ¨µÀ¿ØÖÆ£¨¶ÔÓ¦¼Ü¹¹Í¼£©
+// â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ æ•°æ®é€šé“æ§åˆ¶ï¼ˆå¯¹åº”æ¶æ„å›¾ï¼‰
 always_ff @(posedge clk) begin
-    if(rst) begin
+    if(rst_n) begin
         a_reg <= '0;
         b_reg <= '0;
         partial_sum_reg <= '0;
@@ -154,79 +167,13 @@ always_ff @(posedge clk) begin
     end
 end
 
-// ¨€¨€¨€¨€¨€ ¿ØÖÆĞÅºÅÉú³É£¨¾«È·Ê±Ğò¿ØÖÆ£©
+// â–ˆâ–ˆâ–ˆâ–ˆâ–ˆ æ§åˆ¶ä¿¡å·ç”Ÿæˆï¼ˆç²¾ç¡®æ—¶åºæ§åˆ¶ï¼‰
 assign mul_start = (current_state == MUL);
 assign add_start = (current_state == ADD);
 
-// ³Ë·¨Íê³É¼ì²â£¨¼ÙÉè3ÖÜÆÚÑÓ³Ù£©
-logic [1:0] mul_counter;
-always_ff @(posedge clk) begin
-    if(current_state == MUL) begin
-        mul_counter <= mul_counter + 1;
-        mul_finish <= (mul_counter == 2'd2);
-    end else begin
-        mul_counter <= '0;
-        mul_finish <= 1'b0;
-    end
-end
-
-// ¼Ó·¨Íê³É¼ì²â£¨Á÷Ë®Ïß½×¶ÎÆ¥Åä£©
-logic [ADD_PIPE_STAGES-1:0] add_pipe;
-always_ff @(posedge clk) begin
-    add_pipe <= {add_pipe[ADD_PIPE_STAGES-2:0], add_start};
-    add_finish <= add_pipe[ADD_PIPE_STAGES-1];
-end
 
 endmodule
 
-// ¨€¨€¨€¨€¨€ IPºË°ü×°Ä£¿é£¨Ê¾Àı£©
-module multiplier_ip #(
-    parameter DWIDTH = 64
-)(
-    input  logic             clk,
-    input  logic             ce,
-    input  logic [DWIDTH-1:0] a,
-    input  logic [DWIDTH-1:0] b,
-    output logic [DWIDTH-1:0] p
-);
 
-// Xilinx DSP48E2ÊµÀı»¯Ä£°å
-DSP48E2 #(
-    .AMULTSEL("A"),
-    .BMULTSEL("B"),
-    .USE_MULT("MULTIPLY")
-) u_dsp (
-    .CLK(clk),
-    .CE(ce),
-    .A(a),
-    .B(b),
-    .P(p)
-);
 
-endmodule
 
-module adder_ip #(
-    parameter DWIDTH = 64,
-    parameter PIPE_STAGES = 2
-)(
-    input  logic             clk,
-    input  logic             ce,
-    input  logic [DWIDTH-1:0] a,
-    input  logic [DWIDTH-1:0] b,
-    output logic [DWIDTH-1:0] s
-);
-
-// Á÷Ë®Ïß¼Ó·¨Æ÷ÊµÏÖ
-logic [DWIDTH-1:0] pipe_reg [PIPE_STAGES-1:0];
-
-always_ff @(posedge clk) begin
-    if(ce) begin
-        pipe_reg[0] <= a + b;
-        for(int i=1; i<PIPE_STAGES; i++)
-            pipe_reg[i] <= pipe_reg[i-1];
-    end
-end
-
-assign s = pipe_reg[PIPE_STAGES-1];
-
-endmodule

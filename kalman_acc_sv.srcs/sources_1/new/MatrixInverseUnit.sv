@@ -25,10 +25,10 @@ module MatrixInverseUnit #(
 )(
     input  logic                clk,           // 时钟信号
     input  logic                rst_n,         // 复位信号（低有效）
-    input  logic [DWIDTH-1:0]   P_prev [0:12-1][0:12-1],   //p_k-1,k-1
-    input  logic [DWIDTH-1:0]   Qk [0:12-1][0:12-1],  
-    input  logic [DWIDTH-1:0]   Rk [0:5][0:5],  // 测量噪声矩阵
-    output logic [DWIDTH-1:0]   inv_max [0:5][0:5]
+    input  logic [DWIDTH-1:0]   P_k1k1 [0:12-1][0:12-1],   //p_k-1,k-1
+    input  logic [DWIDTH-1:0]   Q_k [0:12-1][0:12-1],  
+    input  logic [DWIDTH-1:0]   R_k [0:5][0:5],  // 测量噪声矩阵
+    output logic [DWIDTH-1:0]   inv_matrix [0:5][0:5]
 );
 
 
@@ -42,29 +42,29 @@ CEU_a #(
 ) u_CEU_a (
     .clk          (clk),
     .rst_n        (rst_n),
-    // 动态输入：替换为 P_prev[i][j] 形式
-    .Theta_1_1    (P_prev[0][0]),
-    .Theta_4_1    (P_prev[3][0]),
-    .Theta_7_1    (P_prev[6][0]),
-    .Theta_4_4    (P_prev[3][3]),
-    .Theta_10_1   (P_prev[9][0]),
-    .Theta_7_4    (P_prev[6][3]),
-    .Theta_10_4   (P_prev[9][3]),
-    .Theta_7_7    (P_prev[6][6]),
-    .Theta_10_7   (P_prev[9][6]),
-    .Theta_10_10  (P_prev[9][9]),
-    .Q_1_1        (Qk[0][0]),
-    .R_1_1        (Rk[0][0]),
+    // 动态输入：替换为 P_k1k1[i][j] 形式
+    // .Theta_1_1    (P_k1k1[0][0]),
+    .Theta_4_1    (P_k1k1[3][0]),
+    .Theta_7_1    (P_k1k1[6][0]),
+    .Theta_4_4    (P_k1k1[3][3]),
+    .Theta_10_1   (P_k1k1[9][0]),
+    .Theta_7_4    (P_k1k1[6][3]),
+    .Theta_10_4   (P_k1k1[9][3]),
+    .Theta_7_7    (P_k1k1[6][6]),
+    .Theta_10_7   (P_k1k1[9][6]),
+    .Theta_10_10  (P_k1k1[9][9]),
+    .Q_1_1        (Q_k[0][0]),
+    .R_1_1        (R_k[0][0]),
     // 固定参数
-    .delta_t2     (delta_t2),
-    .delta_t_sq   (delta_t_sq),
-    .delta_t_cu   (delta_t_cu),
-    .delta_t_qu   (delta_t_qu),
-    .delta_t_qi   (delta_t_qi),
-    .delta_t_sx   (delta_t_sx),
-    // 输出
-    .a_out        (a),
-    .valid_out    (valid_out)
+    .dt_1   (delta_t2           ),
+    .dt_2   (delta_t_sq         ),
+    .dt_3   (delta_t_cu         ),
+    .dt_4   (delta_t_qu         ),
+    .dt_5   (delta_t_qi         ),
+    .dt_6   (delta_t_sx         ),
+    // 输出 
+    .a_out        (a            ),
+    .valid_out    (valid_out    )
 );
 
 CEU_a #(
@@ -72,25 +72,25 @@ CEU_a #(
 ) u_CEU_b (
     .clk          (clk),
     .rst_n        (rst_n),
-    // 动态输入：替换为 P_prev[i][j] 形式
-    .Theta_4_1    (P_prev[4][1]),
-    .Theta_7_1    (P_prev[7][1]),
-    .Theta_4_4    (P_prev[4][4]),
-    .Theta_10_1   (P_prev[10][1]),
-    .Theta_7_4    (P_prev[7][4]),
-    .Theta_10_4   (P_prev[10][4]),
-    .Theta_7_7    (P_prev[7][7]),
-    .Theta_10_7   (P_prev[10][7]),
-    .Theta_10_10  (P_prev[10][10]),
-    .Q_1_1        (Qk[1][1]),
-    .R_1_1        (Rk[1][1]),
+    // 动态输入：替换为 P_k1k1[i][j] 形式
+    .Theta_4_1    (P_k1k1[4][1]),
+    .Theta_7_1    (P_k1k1[7][1]),
+    .Theta_4_4    (P_k1k1[4][4]),
+    .Theta_10_1   (P_k1k1[10][1]),
+    .Theta_7_4    (P_k1k1[7][4]),
+    .Theta_10_4   (P_k1k1[10][4]),
+    .Theta_7_7    (P_k1k1[7][7]),
+    .Theta_10_7   (P_k1k1[10][7]),
+    .Theta_10_10  (P_k1k1[10][10]),
+    .Q_1_1        (Q_k[1][1]),
+    .R_1_1        (R_k[1][1]),
     // 固定参数
-    .delta_t2     (delta_t2),
-    .delta_t_sq   (delta_t_sq),
-    .delta_t_cu   (delta_t_cu),
-    .delta_t_qu   (delta_t_qu),
-    .delta_t_qi   (delta_t_qi),
-    .delta_t_sx   (delta_t_sx),
+    .dt_1     (delta_t2),
+    .dt_2   (delta_t_sq),
+    .dt_3   (delta_t_cu),
+    .dt_4   (delta_t_qu),
+    .dt_5   (delta_t_qi),
+    .dt_6   (delta_t_sx),
     // 输出
     .a_out        (b),
     .valid_out    (valid_out)
@@ -102,26 +102,26 @@ CEU_a #(
 ) u_CEU_c (
     .clk          (clk),
     .rst_n        (rst_n),
-    // 动态输入：替换为 P_prev[i][j] 形式
-    .Theta_1_1    (P_prev[2][2]),
-    .Theta_4_1    (P_prev[5][2]),
-    .Theta_7_1    (P_prev[8][2]),
-    .Theta_4_4    (P_prev[5][5]),
-    .Theta_10_1   (P_prev[11][2]),
-    .Theta_7_4    (P_prev[8][5]),
-    .Theta_10_4   (P_prev[11][5]),
-    .Theta_7_7    (P_prev[8][8]),
-    .Theta_10_7   (P_prev[11][8]),
-    .Theta_10_10  (P_prev[11][11]),
-    .Q_1_1        (Qk[2][2]),
-    .R_1_1        (Rk[2][2]),
+    // 动态输入：替换为 P_k1k1[i][j] 形式
+    // .Theta_1_1    (P_k1k1[2][2]),
+    .Theta_4_1    (P_k1k1[5][2]),
+    .Theta_7_1    (P_k1k1[8][2]),
+    .Theta_4_4    (P_k1k1[5][5]),
+    .Theta_10_1   (P_k1k1[11][2]),
+    .Theta_7_4    (P_k1k1[8][5]),
+    .Theta_10_4   (P_k1k1[11][5]),
+    .Theta_7_7    (P_k1k1[8][8]),
+    .Theta_10_7   (P_k1k1[11][8]),
+    .Theta_10_10  (P_k1k1[11][11]),
+    .Q_1_1        (Q_k[2][2]),
+    .R_1_1        (R_k[2][2]),
     // 固定参数
-    .delta_t2     (delta_t2),
-    .delta_t_sq   (delta_t_sq),
-    .delta_t_cu   (delta_t_cu),
-    .delta_t_qu   (delta_t_qu),
-    .delta_t_qi   (delta_t_qi),
-    .delta_t_sx   (delta_t_sx),
+    .dt_1     (delta_t2),
+    .dt_2   (delta_t_sq),
+    .dt_3   (delta_t_cu),
+    .dt_4   (delta_t_qu),
+    .dt_5   (delta_t_qi),
+    .dt_6   (delta_t_sx),
     // 输出
     .a_out        (c),
     .valid_out    (valid_out)
@@ -138,14 +138,14 @@ CEU_d #(
     .clk         (clk),
     .rst_n       (rst_n),
     // 动态输入：索引均减一
-    .Theta_10_7  (P_prev[9][6]),    // 10→9, 7→6
-    .Theta_7_4   (P_prev[6][3]),    // 7→6, 4→3
-    .Theta_10_4  (P_prev[9][3]),    // 10→9, 4→3
-    .Theta_4_7   (P_prev[3][6]),    // 4→3, 7→6
-    .Theta_10_10 (P_prev[9][9]),    // 10→9, 10→9
-    .Theta_4_4   (P_prev[3][3]),    // 4→3, 4→3
-    .Q_4_4       (Qk[3][3]),        // 4→3, 4→3
-    .R_4_4       (Rk[3][3]),        // 4→3, 4→3
+    .Theta_10_7  (P_k1k1[9][6]),    // 10→9, 7→6
+    .Theta_7_4   (P_k1k1[6][3]),    // 7→6, 4→3
+    .Theta_10_4  (P_k1k1[9][3]),    // 10→9, 4→3
+    .Theta_4_7   (P_k1k1[3][6]),    // 4→3, 7→6
+    .Theta_10_10 (P_k1k1[9][9]),    // 10→9, 10→9
+    .Theta_4_4   (P_k1k1[3][3]),    // 4→3, 4→3
+    .Q_4_4       (Q_k[3][3]),        // 4→3, 4→3
+    .R_4_4       (R_k[3][3]),        // 4→3, 4→3
     // 固定时间参数
     .delta_t2    (delta_t2),
     .delta_t_sq  (delta_t_sq),
@@ -163,14 +163,14 @@ CEU_d #(
     .clk         (clk),
     .rst_n       (rst_n),
     // 动态输入：按 "d" 通道对应的 Θ
-    .Theta_10_7  (P_prev[10][7]),    // 或者你自己的信号名
-    .Theta_7_4   (P_prev[7][4]),
-    .Theta_10_4  (P_prev[10][4]),
-    .Theta_4_7   (P_prev[4][7]),
-    .Theta_10_10 (P_prev[10][10]),
-    .Theta_4_4   (P_prev[4][4]),
-    .Q_4_4       (Qk[4][4]),
-    .R_4_4       (Rk[4][4]),
+    .Theta_10_7  (P_k1k1[10][7]),    // 或者你自己的信号名
+    .Theta_7_4   (P_k1k1[7][4]),
+    .Theta_10_4  (P_k1k1[10][4]),
+    .Theta_4_7   (P_k1k1[4][7]),
+    .Theta_10_10 (P_k1k1[10][10]),
+    .Theta_4_4   (P_k1k1[4][4]),
+    .Q_4_4       (Q_k[4][4]),
+    .R_4_4       (R_k[4][4]),
     // 固定时间参数（上层预先计算或定义）
     .delta_t2    (delta_t2),
     .delta_t_sq  (delta_t_sq),
@@ -188,14 +188,14 @@ CEU_d #(
     .clk         (clk),
     .rst_n       (rst_n),
     // 动态输入：索引均加一
-    .Theta_10_7  (P_prev[11][8]),   // 10→11, 7→8
-    .Theta_7_4   (P_prev[8][5]),    // 7→8, 4→5
-    .Theta_10_4  (P_prev[11][5]),   // 10→11, 4→5
-    .Theta_4_7   (P_prev[5][8]),    // 4→5, 7→8
-    .Theta_10_10 (P_prev[11][11]),  // 10→11, 10→11
-    .Theta_4_4   (P_prev[5][5]),    // 4→5, 4→5
-    .Q_4_4       (Qk[5][5]),        // 4→5, 4→5
-    .R_4_4       (Rk[5][5]),        // 4→5, 4→5
+    .Theta_10_7  (P_k1k1[11][8]),   // 10→11, 7→8
+    .Theta_7_4   (P_k1k1[8][5]),    // 7→8, 4→5
+    .Theta_10_4  (P_k1k1[11][5]),   // 10→11, 4→5
+    .Theta_4_7   (P_k1k1[5][8]),    // 4→5, 7→8
+    .Theta_10_10 (P_k1k1[11][11]),  // 10→11, 10→11
+    .Theta_4_4   (P_k1k1[5][5]),    // 4→5, 4→5
+    .Q_4_4       (Q_k[5][5]),        // 4→5, 4→5
+    .R_4_4       (R_k[5][5]),        // 4→5, 4→5
     // 固定时间参数
     .delta_t2    (delta_t2),
     .delta_t_sq  (delta_t_sq),
@@ -216,27 +216,26 @@ CEU_x #(
     .clk        (clk),
     .rst_n      (rst_n),
 
-    .Theta_1_7  (P_prev[0][6]),   // 1→0, 7→6
-    .Theta_4_4  (P_prev[3][3]),   // 4→3, 4→3
+    .Theta_1_7  (P_k1k1[0][6]),   // 1→0, 7→6
+    .Theta_4_4  (P_k1k1[3][3]),   // 4→3, 4→3
 
-    .Theta_7_4  (P_prev[6][3]),   // 7→6, 4→3
-    .Theta_10_4 (P_prev[9][3]),   // 10→9, 4→3
-    .Theta_7_7  (P_prev[6][6]),   // 7→6, 7→6
+    .Theta_7_4  (P_k1k1[6][3]),   // 7→6, 4→3
+    .Theta_10_4 (P_k1k1[9][3]),   // 10→9, 4→3
+    .Theta_7_7  (P_k1k1[6][6]),   // 7→6, 7→6
 
-    .Theta_10_1 (P_prev[9][0]),   // 10→9, 1→0
+    .Theta_10_1 (P_k1k1[9][0]),   // 10→9, 1→0
 
-    .Theta_10_7 (P_prev[9][6]),   // 10→9, 7→6
-    .Theta_1_4  (P_prev[0][3]),   // 1→0, 4→3
+    .Theta_10_7 (P_k1k1[9][6]),   // 10→9, 7→6
+    .Theta_1_4  (P_k1k1[0][3]),   // 1→0, 4→3
 
-    .Q_1_4      (Qk[0][3]),       // 1→0, 4→3
-    .R_1_4      (Rk[0][3]),       // 1→0, 4→3
+    .Q_1_4      (Q_k[0][3]),       // 1→0, 4→3
+    .R_1_4      (R_k[0][3]),       // 1→0, 4→3
 
     .delta_t    (delta_t),
-    .delta_t2   (delta_t2),
-    .delta_t_sq (delta_t_sq),
-    .delta_t_cu (delta_t_cu),
-    .delta_t_qu (delta_t_qu),
-    .delta_t_qi (delta_t_qi),
+    .half_dt2   (delta_t2),
+    .sixth_dt3 (delta_t_sq),
+    .five12_dt4 (delta_t_cu),
+    .one12_dt5 (delta_t_qu),
 
     .x          (x),
     .valid_out  (x_valid_minus1)
@@ -249,29 +248,28 @@ CEU_x #(
     .clk        (clk),
     .rst_n      (rst_n),
 
-    .Theta_1_7  (P_prev[1][7]),   
-    .Theta_4_4  (P_prev[4][4]),   
+    .Theta_1_7  (P_k1k1[1][7]),   
+    .Theta_4_4  (P_k1k1[4][4]),   
 
-    .Theta_7_4  (P_prev[7][4]),   
-    .Theta_10_4 (P_prev[10][4]),   
-    .Theta_7_7  (P_prev[7][7]),   
+    .Theta_7_4  (P_k1k1[7][4]),   
+    .Theta_10_4 (P_k1k1[10][4]),   
+    .Theta_7_7  (P_k1k1[7][7]),   
 
-    .Theta_10_1 (P_prev[10][1]),  
+    .Theta_10_1 (P_k1k1[10][1]),  
 
-    .Theta_10_7 (P_prev[10][7]),    
-    .Theta_1_4  (P_prev[1][4]),  
+    .Theta_10_7 (P_k1k1[10][7]),    
+    .Theta_1_4  (P_k1k1[1][4]),  
 
     // 噪声项 Q/R
-    .Q_1_4      (Qk[1][4]),       // Q[1,7]
-    .R_1_4      (Rk[1][4]),       // R[1,7]
+    .Q_1_4      (Q_k[1][4]),       // Q[1,7]
+    .R_1_4      (R_k[1][4]),       // R[1,7]
 
     // 固定时间参数
     .delta_t    (delta_t),
-    .delta_t2   (delta_t2),
-    .delta_t_sq (delta_t_sq),
-    .delta_t_cu (delta_t_cu),
-    .delta_t_qu (delta_t_qu),
-    .delta_t_qi (delta_t_qi),
+    .half_dt2   (delta_t2),
+    .sixth_dt3 (delta_t_sq),
+    .five12_dt4 (delta_t_cu),
+    .one12_dt5 (delta_t_qu),
 
     // 输出
     .x          (y),
@@ -284,27 +282,26 @@ CEU_x #(
     .clk        (clk),
     .rst_n      (rst_n),
 
-    .Theta_1_7  (P_prev[2][8]),   // 1→2, 7→8
-    .Theta_4_4  (P_prev[5][5]),   // 4→5, 4→5
+    .Theta_1_7  (P_k1k1[2][8]),   // 1→2, 7→8
+    .Theta_4_4  (P_k1k1[5][5]),   // 4→5, 4→5
 
-    .Theta_7_4  (P_prev[8][5]),   // 7→8, 4→5
-    .Theta_10_4 (P_prev[11][5]),  // 10→11, 4→5
-    .Theta_7_7  (P_prev[8][8]),   // 7→8, 7→8
+    .Theta_7_4  (P_k1k1[8][5]),   // 7→8, 4→5
+    .Theta_10_4 (P_k1k1[11][5]),  // 10→11, 4→5
+    .Theta_7_7  (P_k1k1[8][8]),   // 7→8, 7→8
 
-    .Theta_10_1 (P_prev[11][2]),  // 10→11, 1→2
+    .Theta_10_1 (P_k1k1[11][2]),  // 10→11, 1→2
 
-    .Theta_10_7 (P_prev[11][8]),  // 10→11, 7→8
-    .Theta_1_4  (P_prev[2][5]),   // 1→2, 4→5
+    .Theta_10_7 (P_k1k1[11][8]),  // 10→11, 7→8
+    .Theta_1_4  (P_k1k1[2][5]),   // 1→2, 4→5
 
-    .Q_1_4      (Qk[2][5]),       // 1→2, 4→5
-    .R_1_4      (Rk[2][5]),       // 1→2, 4→5
+    .Q_1_4      (Q_k[2][5]),       // 1→2, 4→5
+    .R_1_4      (R_k[2][5]),       // 1→2, 4→5
 
     .delta_t    (delta_t),
-    .delta_t2   (delta_t2),
-    .delta_t_sq (delta_t_sq),
-    .delta_t_cu (delta_t_cu),
-    .delta_t_qu (delta_t_qu),
-    .delta_t_qi (delta_t_qi),
+    .half_dt2   (delta_t2),
+    .sixth_dt3  (delta_t_sq),
+    .five12_dt4 (delta_t_cu),
+    .one12_dt5  (delta_t_qu),
 
     .x          (z),
     .valid_out  (x_valid_plus1)
@@ -312,13 +309,20 @@ CEU_x #(
 
 // ================== 第二计算阶段：行列式计算 ==================
 // 计算α = a*d - x^2?（行列式核心项）
+logic [DWIDTH-1:0] alpha1, alpha2, alpha3;
+logic [DWIDTH-1:0] inv_alpha11, inv_alpha12, inv_alpha13;
+logic [DWIDTH-1:0] inv_alpha21, inv_alpha22, inv_alpha23;
+logic [DWIDTH-1:0] inv_alpha31, inv_alpha32, inv_alpha33;
+logic [DWIDTH-1:0] _inv_alpha13, _inv_alpha23, _inv_alpha33;
+logic valid_out1, valid_out2, valid_out3;
+
 CEU_alpha u_CEU_alpha1 (
     .clk        (clk),
     .in1        (a),             // 第一行第一列乘积项
     .in2        (d),             // 第二行第二列乘积项
     .in3        (x),             // 交叉项平方
     .out        (alpha1),          // 输出行列式值α
-    .validout   (valid_out1)
+    .valid_out   (valid_out1)
 );
 CEU_alpha u_CEU_alpha2 (
     .clk        (clk),
@@ -326,7 +330,7 @@ CEU_alpha u_CEU_alpha2 (
     .in2        (e),             // 第二行第二列乘积项
     .in3        (y),             // 交叉项平方
     .out        (alpha2),          // 输出行列式值α
-    .validout   (valid_out2)
+    .valid_out   (valid_out2)
 );
 
 CEU_alpha u_CEU_alpha3 (
@@ -335,7 +339,7 @@ CEU_alpha u_CEU_alpha3 (
     .in2        (f),             // 第二行第二列乘积项
     .in3        (z),             // 交叉项平方
     .out        (alpha3),          // 输出行列式值α
-    .validout   (valid_out3)
+    .valid_out   (valid_out3)
 );
 
 
@@ -491,6 +495,6 @@ fp_suber u_fp_suber_z (
 // ==== 输出寄存器组（对应图中Output Reg模块）
 //-----------------------------------------------------------------
 
-assign inv_max = result_reg;         // 驱动输出总线
+assign inv_matrix = result_reg;         // 驱动输出总线
 
 endmodule

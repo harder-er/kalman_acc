@@ -1,36 +1,10 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 2025/05/09 15:57:53
-// Design Name: 
 // Module Name: CMU_PHi34
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
-`timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company:
-// Engineer:
-//
-// Create Date: 2025/05/09
-// Module Name: CMU_PHi34
-// Description: PHi34 通道的 CMU 计算，二级流水计算  
+// Description: PHi34 通道的 CMU 计算，双级流水计算  
 //              a = (Θ7,10 + Q7,10) + (Δt·Θ10,10)
 // Dependencies: fp_multiplier, fp_adder
 //////////////////////////////////////////////////////////////////////////////////
-
 module CMU_PHi34 #(
     parameter DBL_WIDTH = 64
 )(
@@ -47,56 +21,62 @@ module CMU_PHi34 #(
     output logic                   valid_out
 );
 
-
     // 中间信号
-    logic [DBL_WIDTH-1:0] X1, T1;
-    // 流水段寄存器
+    logic [DBL_WIDTH-1:0] T1, X1;
+
+    // valid/finish 信号
+    logic addA_valid,    finish_A1;
+    logic multX_valid,   finish_X1;
+    logic final_valid,   finish_final;
+
+    // 流水段寄存器（保持原样）
     logic [DBL_WIDTH-1:0] stage1_T1, stage1_X1;
     logic [DBL_WIDTH-1:0] stage2_a;
+    // 有效信号管线，2 级流水
     logic [1:0]           valid_pipe;
 
-    // ----------------- 子模块实例化 -----------------
-    // X1 = Δt * Θ10,10
-    fp_multiplier U_mul_X1 (
-        .clk    (clk),
-        .a      (delta_t),
-        .b      (Theta_10_10),
-        .result (X1)
-    );
-    // T1 = Θ7,10 + Q7,10
+    // ----------------- Stage1: 加法 A1 and 乘法 X1 -----------------
+    assign addA_valid = 1'b1;
     fp_adder U_add_T1 (
         .clk    (clk),
+        .valid  (addA_valid),
+        .finish (finish_A1),
         .a      (Theta_7_10),
         .b      (Q_7_10),
         .result (T1)
     );
-    // final a = T1 + X1
+
+    assign multX_valid = finish_A1;
+    fp_multiplier U_mul_X1 (
+        .clk    (clk),
+        .valid  (multX_valid),
+        .finish (finish_X1),
+        .a      (delta_t),
+        .b      (Theta_10_10),
+        .result (X1)
+    );
+
+    // ----------------- Stage2: final a = T1 + X1 -----------------
+    assign final_valid = finish_X1;
     fp_adder U_add_final (
         .clk    (clk),
-        .a      (stage1_T1),
-        .b      (stage1_X1),
+        .valid  (final_valid),
+        .finish (finish_final),
+        .a      (T1),
+        .b      (X1),
         .result (stage2_a)
     );
 
     // ----------------- 流水线寄存与控制 -----------------
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            stage1_T1   <= '0;
-            stage1_X1   <= '0;
-            stage2_a    <= '0;
             valid_pipe  <= 2'b00;
         end else begin
-            // Stage1 寄存 T1, X1
-            stage1_T1   <= T1;
-            stage1_X1   <= X1;
-            // Stage2 寄存输出 a
-            stage2_a    <= stage2_a; 
-            // valid 管线移位注入
-            valid_pipe  <= { valid_pipe[0], 1'b1 };
+            valid_pipe  <= { valid_pipe[0], finish_final };
         end
     end
 
     assign a         = stage2_a;
-    assign valid_out = valid_pipe[1];
+    assign valid_out = valid_pipe[1]&final_valid;
 
 endmodule

@@ -36,14 +36,30 @@ module KalmanGainCalculator #(
     input  logic [DWIDTH-1:0]     R_k [0:5][0:5]            ,  // 测量噪声矩阵
     
     // 输出接口（OMBus）
-    output logic [DWIDTH-1:0]     K_k [0:12-1][0:12-1]  // 卡尔曼增益
+    output logic [DWIDTH-1:0]     K_k [0:12-1][0:6-1]  // 卡尔曼增益
 );
 
 // █████ CMU模块（矩阵计算单元）
 //-----------------------------------------------------------------
-logic [DWIDTH-1:0] P_predicted [0:12-1][0:12-1];
-logic [DWIDTH-1:0] P_predicted_HT [0:12-1][0:12-1];
-logic              cmu_complete;
+// 参数定义
+localparam N = 12;
+localparam M = 6;
+  
+// 预测协方差矩阵
+logic [DWIDTH-1:0] P_predicted    [0:N-1][0:N-1];
+// 结果：P_predicted * H^T, 大小 12×6
+logic [DWIDTH-1:0] P_predicted_HT [0:N-1][0:M-1];
+
+// integer i, j;
+always_comb begin
+    for (integer i = 0; i < N; i = i + 1) begin
+        for (integer j = 0; j < M; j = j + 1) begin
+            // 直接取 P_predicted 的前 6 列
+            P_predicted_HT[i][j] = P_predicted[i][j];
+        end 
+    end
+end
+
 
 generate
     // Φ1,1块专用CMU
@@ -481,47 +497,6 @@ generate
 
 endgenerate
 
-// ================== 矩阵构建逻辑 ==================
-// // 非对角线清零
-// always_comb begin
-//     for(int i=0; i<12; i++) begin
-//         for(int j=0; j<12; j++) begin
-//             if(!((j/3 == i/3) && (j%3 == i%3))) begin
-//                 P_predicted[i][j] = 64'h0;
-//             end
-//         end
-//     end
-// end
-
-
-// █████ 数据缓冲FIFO
-//-----------------------------------------------------------------
-// logic [DWIDTH*3-1:0] fifo_data_in;
-// logic [DWIDTH*3-1:0] fifo_data_out;
-// logic                fifo_wr_en, fifo_rd_en;
-// logic                fifo_full, fifo_empty;
-
-// FIFO_3x64 #(
-//     .DEPTH(FIFO_DEPTH),
-//     .DWIDTH(DWIDTH*3)
-// ) u_fifo (
-//     .clk(clk),
-//     .rst_n(rst_n),
-//     .wr_en(fifo_wr_en),
-//     .data_in(fifo_data_in),
-//     .rd_en(fifo_rd_en),
-//     .data_out(fifo_data_out),
-//     .full(fifo_full),
-//     .empty(fifo_empty)
-// );
-
-// FIFO写入控制（存储P_predicted）
-// always_comb begin
-//     fifo_wr_en = cmu_complete;
-//     for(int i=0; i<3; i++) begin
-//         fifo_data_in[i*DWIDTH +: DWIDTH] = P_predicted[i][0];  // 存储第0列
-//     end
-// end
 
 // █████ CEU模块（元素计算单元）
 //-----------------------------------------------------------------
@@ -531,34 +506,70 @@ logic              ceu_complete;
 MatrixInverseUnit #(
     .DWIDTH(DWIDTH)
 ) u_MatrixInverseUnit (
-    .clk(clk),
-    .rst_n(rst_n),
-    .P_k1k1(P_k1k1),
-    .R_k(R_matrix),
-    .Q_k(Q_matrix),
-//    .valid_in(ceu_valid_in),
-    .inv_matrix(inv_matrix)
-//    .ceu_done(ceu_complete)
+    .clk        (clk        ),
+    .rst_n      (rst_n      ),
+    .P_k1k1     (P_k1k1     ),
+    .R_k        (R_k        ),
+    .Q_k        (Q_k        ),
+//    .valid    _in(ceu_valid_in),
+    .inv_matrix (inv_matrix )
+//    .ceu_done (ceu_complete)
 );
 
 
 
+// 扩展到 12×12
+logic [DWIDTH-1:0] inv_matrix12 [0:11][0:11];
+
+generate
+  for (genvar i = 0; i < 12; i = i + 1) begin
+    for (genvar j = 0; j < 12; j = j + 1) begin
+      // 左上 6×6 保持原 inv_matrix6，其余位置填 0
+      assign inv_matrix12[i][j] =
+               (i < 6 && j < 6) ? inv_matrix[i][j]
+                                : {DWIDTH{1'b0}};
+    end
+  end
+endgenerate
+
+logic [DWIDTH-1:0] P_predicted_HT12 [0:11][0:11];
+
+generate
+  for (genvar i = 0; i < 12; i = i + 1) begin
+    for (genvar j = 0; j < 12; j = j + 1) begin
+      // 左上 6×6 保持原 P_predicted_HT6，其余位置填 0
+      assign P_predicted_HT12[i][j] =
+               (j < 6) ? P_predicted_HT[i][j]
+                                : {DWIDTH{1'b0}};
+    end
+  end
+endgenerate
 // █████ 脉动阵列接口
 //-----------------------------------------------------------------
+logic [DWIDTH-1:0] K_k_matrix [0:11][0:12-1]; // 卡尔曼增益矩阵
 SystolicArray #(
-    .DWIDTH(DWIDTH),
-    .ARRAY_SIZE(3)
+    .DWIDTH(64),
+    .N(12),
+    .LATENCY(12)
 ) u_systolic (
-    .clk(clk),
-    .rst_n(rst_n),
-    .a_row(P_pred),   // 来自FIFO的P_predicted
-    .b_col(inv_matrix),      // CEU计算的逆矩阵
-    .load_en(ceu_complete), // CEU完成后加载
-    .enb_1(ceu_valid_in), // CEU有效信号
-    .enb_2_6(cmu_valid_in), // CMU有效信号
-    .enb_7_12(ceu_complete), // CEU完成信号
-    .c_out(K_k)
+    .clk        (   clk                 ),
+    .rst_n      (   rst_n               ),
+    .a_row      (   P_predicted_HT12    ),   // 来自FIFO的P_predicted
+    .b_col      (   inv_matrix12        ),      // CEU计算的逆矩阵
+    .load_en    (   ceu_complete        ), // CEU完成后加载
+    .enb_1      (   ceu_valid_in        ), // CEU有效信号
+    .enb_2_6    (   cmu_valid_in        ), // CMU有效信号
+    .enb_7_12   (   ceu_complete        ), // CEU完成信号
+    .c_out      (   K_k_matrix          ) // 输出卡尔曼增益     
 );
+
+generate
+    for (genvar i = 0; i < 12; i = i + 1) begin
+        for (genvar j = 0; j < 6; j = j + 1) begin
+            assign K_k[i][j] = K_k_matrix[i][j];
+        end
+    end
+endgenerate
 
 // // █████ 时序同步控制
 // //-----------------------------------------------------------------

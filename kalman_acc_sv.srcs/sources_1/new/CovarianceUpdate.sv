@@ -22,42 +22,38 @@
 
 module CovarianceUpdate #(
     parameter STATE_DIM = 12,
+    parameter K_DIM = 6,
     parameter DWIDTH = 64
 )(
     input  logic                    clk                                     ,
     input  logic                    rst_n                                   ,          
-    // MIBus输入接口（对应图示紫色模块接口）    
-    input  logic [DWIDTH-1:0]       K_k     [STATE_DIM-1:0][STATE_DIM-1:0]  ,
-    input  logic [DWIDTH-1:0]       R_k     [STATE_DIM-1:0][STATE_DIM-1:0]  ,
+
+    input  logic [DWIDTH-1:0]       K_k     [STATE_DIM-1:0][K_DIM-1:0]      ,
+    input  logic [DWIDTH-1:0]       R_k     [K_DIM-1:0][K_DIM-1:0]          ,
     input  logic [DWIDTH-1:0]       P_kk1   [STATE_DIM-1:0][STATE_DIM-1:0]  ,
-    // OMBus输出接口（对应图示橙色输出路径）
+
     output logic [DWIDTH-1:0]       P_kk    [STATE_DIM-1:0][STATE_DIM-1:0]  ,
 
     input  logic                    CKG_Done                                ,
     output logic                    SCU_Done
 );
 
-// ================== 脉动阵列核心单元 ==================
-// 矩阵乘法单元配置（对应图示蓝色运算模块）
+
 logic [DWIDTH-1:0] Kkmatrix [STATE_DIM-1:0][6-1:0]; // Kk结果
 logic [DWIDTH-1:0] KkTmatrix [6-1:0][STATE_DIM-1:0]; // Kk转置结果
-// ================= 矩阵转置桥实例 =================
+
+
 MatrixTransBridge #(
     .ROWS(12),        
     .COLS(6),       
     .DATA_WIDTH(DWIDTH) 
 ) u_MatrixBridge (
-    .clk(clk),            
-    .rst_n(rst_n),         
-
-    .mat_in(K_k),  
-    
-
-    .mat_org(Kkmatrix),  
-    .mat_trans(KkTmatrix), 
-    
-    // 状态信号
-    .valid_out(process_done) // 网页9时序图标注的完成信号
+    .clk        (   clk             ),            
+    .rst_n      (   rst_n           ),         
+    .mat_in     (   K_k             ),  
+    .mat_org    (   Kkmatrix        ),  
+    .mat_trans  (   KkTmatrix       ), 
+    .valid_out  (   process_done    ) 
 );
 
 logic [DWIDTH-1:0] KkH  [STATE_DIM-1:0][STATE_DIM-1:0]; 
@@ -87,99 +83,152 @@ generate
                 if (i == j) begin
                     fp_suber u_fp_suber(
                         .clk(clk),
-                        .a(64'h3FF0000000000000), // 单位矩阵对角线元素
-                        .b(KkH[i][j]), // KkH[i][j]元素
-                        .result(IKkH[i][j]) // 计算结果
+                        .a(64'h3FF0000000000000), 
+                        .b(KkH[i][j]), 
+                        .result(IKkH[i][j]) 
                     );
                 end else begin
                         fp_suber u_fp_suber(
                             .clk(clk),
-                            .a(64'h000000000000000), // 非对角线元素
-                            .b(KkH[i][j]), // KkH[i][j]元素
-                            .result(IKkH[i][j]) // 计算结果
+                            .a(64'h000000000000000), 
+                            .b(KkH[i][j]), 
+                            .result(IKkH[i][j]) 
                         );
                 end
             end
         end
     end
 endgenerate
+    
+    logic [DWIDTH-1:0] K_k_matrix           [STATE_DIM-1:0][STATE_DIM-1:0]; 
+    logic [DWIDTH-1:0] R_k_matrix           [STATE_DIM-1:0][STATE_DIM-1:0];
+    logic [DWIDTH-1:0] KR_result            [STATE_DIM-1:0][STATE_DIM-1:0]; 
+    logic [DWIDTH-1:0] KkTmatrix_systolic   [STATE_DIM-1:0][STATE_DIM-1:0]; // 矩阵赋值
 
+    logic [DWIDTH-1:0] IKHmatrix    [STATE_DIM-1:0][STATE_DIM-1:0];
+    logic [DWIDTH-1:0] IKHT         [STATE_DIM-1:0][STATE_DIM-1:0];
+    logic [DWIDTH-1:0] IKHP         [STATE_DIM-1:0][STATE_DIM-1:0];
+
+    logic [DWIDTH-1:0] IKHPIKHT     [STATE_DIM-1:0][STATE_DIM-1:0]; // 矩阵赋值
+    logic [DWIDTH-1:0] KRKt         [STATE_DIM-1:0][STATE_DIM-1:0]; // 矩阵赋值
 generate
+    for (genvar i = 0; i < STATE_DIM; i++) begin 
+        for (genvar j = 0; j < STATE_DIM; j++) begin 
+            if (j < 6) begin
+                assign K_k_matrix[i][j] = K_k[i][j]; // K矩阵赋值
+            end else begin
+                assign K_k_matrix[i][j] = 64'h0; // 非K矩阵元素赋值为0
+            end
+        end
+    end
+    for (genvar i = 0; i < STATE_DIM; i++) begin 
+        for (genvar j = 0; j < STATE_DIM; j++) begin 
+            if (i < 6 && j < 6) begin
+                assign R_k_matrix[i][j] = R_k[i][j]; // K矩阵赋值
+            end else begin
+                assign R_k_matrix[i][j] = 64'h0; // 非K矩阵元素赋值为0
+            end
+        end
+    end
     // K*R计算单元（对应图示路径①）
-    SystolicArray #(.DWIDTH(DWIDTH), .MAX_SIZE(STATE_DIM)) u_systolic (
-        .clk(clk),
-        .rst_n(rst_n),
-        .a_row(K_k),         // K矩阵行输入
-        .b_col(R_k),         // R矩阵列输入
-        .load_en(valid_in),
-        .enb_1(1'b0),       // 全阵列激活
-        .enb_2_6(1'b0),
-        .enb_7_12(1'b1),
-        .c_out(KR_result)   // 输出到FIFO
+    SystolicArray #(
+        .DWIDTH(64),
+        .N(12),
+        .LATENCY(12)
+    ) u_systolic (
+        .clk        ( clk           ),
+        .rst_n      ( rst_n         ),
+        .a_row      ( K_k_matrix    ),         
+        .b_col      ( R_k_matrix    ),         
+        .load_en    ( valid_in      ),
+        .enb_1      ( 1'b0          ),       
+        .enb_2_6    ( 1'b0          ),
+        .enb_7_12   ( 1'b1          ),
+        .c_out      ( KR_result     )   
     );
 
+    for (genvar i = 0; i < STATE_DIM; i++) begin 
+        for (genvar j = 0; j < STATE_DIM; j++) begin 
+            if (i < 6) begin
+                assign KkTmatrix_systolic[i][j] = KkTmatrix[i][j]; // K矩阵赋值
+            end else begin
+                assign KkTmatrix_systolic[i][j] = 64'h0; // 非K矩阵元素赋值为0
+            end
+        end
+    end
     // (K*R)*K^T计算单元（对应图示路径②）
-    SystolicArray #(.DWIDTH(DWIDTH), .MAX_SIZE(STATE_DIM)) u_systolic_1 (
-        .clk(clk),
-        .rst_n(rst_n),
-        .a_row(KR_result),  // K*R结果输入
-        .b_col(KkTmatrix), // K转置输入
-        .load_en(kr_done),
-        .enb_1(1'b0),
-        .enb_2_6(1'b0),
-        .enb_7_12(1'b1),
-        .c_out(KRKt)
+    SystolicArray #(
+        .DWIDTH(64),
+        .N(12),
+        .LATENCY(12)
+    ) u_systolic_1 (
+        .clk        (   clk                 ),
+        .rst_n      (   rst_n               ),
+        .a_row      (   KR_result           ),  
+        .b_col      (   KkTmatrix_systolic  ), 
+        .load_en    (   kr_done             ),
+        .enb_1      (   1'b0                ),
+        .enb_2_6    (   1'b0                ),
+        .enb_7_12   (   1'b1                ),
+        .c_out      (   KRKt                )
     );
 
-    logic [DWIDTH-1:0] IKHmatrix [STATE_DIM-1:0][STATE_DIM-1:0];
-    logic [DWIDTH-1:0] IKHT [STATE_DIM-1:0][STATE_DIM-1:0];
-    logic [DWIDTH-1:0] IKHP [STATE_DIM-1:0][STATE_DIM-1:0];
+    
 
     MatrixTransBridge #(
-        .ROWS(12),        // 行数（网页6方案扩展）
-        .COLS(12),        // 列数
-        .DATA_WIDTH(DWIDTH) // 数据位宽（网页3双精度要求）
+        .ROWS(12),        
+        .COLS(12),        
+        .DATA_WIDTH(DWIDTH)
     ) u_MatrixBridge_2 (
-        .clk(clk),             // 连接系统时钟
-        .rst_n(rst_n),         // 连接复位信号
-        // 输入矩阵（来自传感器预处理）
-        .mat_in(IKH),  // 网页5所示的传感器数据阵列
-        
-        // 输出矩阵
-        .mat_org(IKHmatrix),  // 原始矩阵（用于网页7的QR分解）
-        .mat_trans(IHKT), // 转置矩阵（用于网页8的Systolic阵列）
-        
-        // 状态信号
-        .valid_out(process_done) // 网页9时序图标注的完成信号
+        .clk        ( clk          ),             
+        .rst_n      ( rst_n        ),        
+        .mat_in     ( IKkH         ), 
+        .mat_org    ( IKHmatrix    ),  
+        .mat_trans  ( IKHT         ), 
+        .valid_out  ( process_done ) 
     );
-    SystolicArray #(.DWIDTH(DWIDTH), .MAX_SIZE(STATE_DIM)) u_systolic_2 (
-        .clk(clk),
-        .rst_n(rst_n),
-        .a_row(IKHmatrix), // 硬件生成单位矩阵
-        .b_col(P_kk1),
-        .load_en(ikh_done),
-        .enb_1(1'b0),
-        .enb_2_6_('b1),      // 激活中间区域
-        .enb_7_12(1'b0),
-        .c_out(IKH_P)
+    
+    SystolicArray #(
+        .DWIDTH(64),
+        .N(12),
+        .LATENCY(12)
+    ) u_systolic_2 (
+        .clk        (   clk         ),
+        .rst_n      (   rst_n       ),
+        .a_row      (   IKHmatrix   ), // 硬件生成单位矩阵
+        .b_col      (   P_kk1       ),
+        .load_en    (   ikh_done    ),
+        .enb_1      (   1'b0        ),
+        .enb_2_6    (   'b1         ),      // 激活中间区域
+        .enb_7_12   (   1'b0        ),
+        .c_out      (   IKHP       )
     );
 
     // 
-    SystolicArray #(.DWIDTH(DWIDTH), .MAX_SIZE(STATE_DIM)) u_systolic_3 (
-        .clk(clk),
-        .rst_n(rst_n),
-        .a_row(IKHP), // 硬件生成单位矩阵
-        .b_col(IKHT),
-        .load_en(ikh_done),
-        .enb_1(1'b0),
-        .enb_2_6(1'b1),      // 激活中间区域
-        .enb_7_12(1'b0),
-        .c_out(P_kk)
+    SystolicArray #(
+        .DWIDTH(64),
+        .N(12),
+        .LATENCY(12)
+    ) u_systolic_3 (
+        .clk        (   clk         ),
+        .rst_n      (   rst_n       ),
+        .a_row      (   IKHP        ), // 硬件生成单位矩阵
+        .b_col      (   IKHT        ),
+        .load_en    (   ikh_done    ),
+        .enb_1      (   1'b0        ),
+        .enb_2_6    (   1'b1        ),      // 激活中间区域
+        .enb_7_12   (   1'b0        ),
+        .c_out      (   IKHPIKHT    )
     );
+
+    for (genvar i = 0; i < STATE_DIM; i++) begin 
+        for (genvar j = 0; j < STATE_DIM; j++) begin 
+            assign P_kk[i][j] = KRKt[i][j]+IKHPIKHT[i][j]; // K矩阵赋值
+        end
+    end
+
 endgenerate
 
-
-// 该模块需要优化，只能用一个sys
 
 
 endmodule

@@ -1,37 +1,8 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 2025/05/09 15:28:58
-// Design Name: 
 // Module Name: CMU_PHi12
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
+// Description: CMU_PHi11 升级版，支持 PHi12 通道的六级流水计算
 //////////////////////////////////////////////////////////////////////////////////
-
-
-`timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-//
-// Create Date: 2025/05/08
-// Module Name: CMU_PHi12
-// Description: CMU_PHi11 的升级版，支持 PHi12 通道的六级流水计算
-//              a = T5 + T4
-// Dependencies: fp_multiplier, fp_adder
-//////////////////////////////////////////////////////////////////////////////////
-
 module CMU_PHi12 #(
     parameter DBL_WIDTH = 64
 )(
@@ -60,33 +31,47 @@ module CMU_PHi12 #(
     output logic                   valid_out
 );
 
-    // 中间信号
+    // **中间信号**
+    // M1..M3；A1..A4；X1..X6；T1..T5
     logic [DBL_WIDTH-1:0] M1, M2, M3;
     logic [DBL_WIDTH-1:0] A1, A2, A3, A4;
     logic [DBL_WIDTH-1:0] X1, X2, X3, X4, X5, X6;
     logic [DBL_WIDTH-1:0] T1, T2, T3, T4, T5;
-    logic [5:0]           valid_pipe;
 
-    // 浮点 IP 核
+    // valid/finish 信号线
+    logic multM_valid, finish_M1, finish_M2, finish_M3;
+    logic addA_valid, finish_A1, finish_A2, finish_A3, finish_A4;
+    logic multX_valid, finish_X1, finish_X2, finish_X3, finish_X4, finish_X5, finish_X6;
+    logic addT_valid, finish_T1, finish_T2, finish_T3, finish_T4, finish_T5;
+    logic final_valid, finish_final;
 
+    // 管线有效信号
+    logic [5:0] valid_pipe;
 
     // ------------------------------------------------------------------------
-    // 常数乘法： M1=3*Θ4,7； M2=3*Θ7,7； M3=4*Θ10,4
+    // 常数乘法： M1=3*Θ4,7； M2=3*Θ7,7； M3=4*Θ10,10
     // ------------------------------------------------------------------------
+    assign multM_valid = 1'b1;
     fp_multiplier mult_M1 (
         .clk    (clk),
+        .valid  (multM_valid),
+        .finish (finish_M1),
         .a      (64'h4008_0000_0000_0000),  // 3.0
         .b      (Theta_4_7),
         .result (M1)
     );
     fp_multiplier mult_M2 (
         .clk    (clk),
+        .valid  (multM_valid),
+        .finish (finish_M2),
         .a      (64'h4008_0000_0000_0000),  // 3.0
         .b      (Theta_7_7),
         .result (M2)
     );
     fp_multiplier mult_M3 (
         .clk    (clk),
+        .valid  (multM_valid),
+        .finish (finish_M3),
         .a      (64'h4010_0000_0000_0000),  // 4.0
         .b      (Theta_4_10),
         .result (M3)
@@ -94,166 +79,161 @@ module CMU_PHi12 #(
 
     // ------------------------------------------------------------------------
     // 加法： A1 = Θ1,1 + Q1,4
-    //       A2 = Θ1,7 + Θ4,4    (note: Θ4,4 = Θ_1_4’s second index? assume given)
+    //       A2 = Θ1,7 + Θ1,4
     //       A3 = Θ1,10 + M1
     //       A4 = M2 + M3
     // ------------------------------------------------------------------------
+    assign addA_valid = finish_M1 & finish_M2 & finish_M3;
     fp_adder add_A1 (
         .clk    (clk),
+        .valid  (addA_valid),
+        .finish (finish_A1),
         .a      (Theta_1_1),
         .b      (Q_1_4),
         .result (A1)
     );
     fp_adder add_A2 (
         .clk    (clk),
+        .valid  (addA_valid),
+        .finish (finish_A2),
         .a      (Theta_1_7),
-        .b      (Theta_1_4),   // NOTE: use Θ4,4 if available
+        .b      (Theta_1_4),
         .result (A2)
     );
     fp_adder add_A3 (
         .clk    (clk),
+        .valid  (addA_valid),
+        .finish (finish_A3),
         .a      (Theta_1_10),
         .b      (M1),
         .result (A3)
     );
     fp_adder add_A4 (
         .clk    (clk),
+        .valid  (addA_valid),
+        .finish (finish_A4),
         .a      (M2),
         .b      (M3),
         .result (A4)
     );
 
     // ------------------------------------------------------------------------
-    // 时间乘法、系数： 
-    //  X1 = 2Δt * Θ1,4
-    //  X2 = ½Δt² * A2
-    //  X3 = ⅙Δt³ * A3
-    //  X4 = 5/12Δt⁴ * A4
-    //  X5 = 1/12Δt⁵ * Θ7,10
-    //  X6 = ??? Δt⁶ * Θ10,10 (可忽略或用六级流水)
+    // 时间乘法：X1..X6
     // ------------------------------------------------------------------------
+    assign multX_valid = finish_A1 & finish_A2 & finish_A3 & finish_A4;
     fp_multiplier mult_X1 (
         .clk    (clk),
-        .a      (delta_t2),    // 2·Δt
+        .valid  (multX_valid),
+        .finish (finish_X1),
+        .a      ({1'b0,delta_t[DBL_WIDTH-1:1]}), // 2*Δt
         .b      (Theta_1_4),
         .result (X1)
     );
     fp_multiplier mult_X2 (
         .clk    (clk),
-        .a      (half_dt2),    // ½·Δt²
+        .valid  (multX_valid),
+        .finish (finish_X2),
+        .a      (half_dt2),
         .b      (A2),
         .result (X2)
     );
     fp_multiplier mult_X3 (
         .clk    (clk),
-        .a      (sixth_dt3),   // ⅙·Δt³
+        .valid  (multX_valid),
+        .finish (finish_X3),
+        .a      (sixth_dt3),
         .b      (A3),
         .result (X3)
     );
     fp_multiplier mult_X4 (
         .clk    (clk),
-        .a      (five12_dt4),  // 5/12·Δt⁴
+        .valid  (multX_valid),
+        .finish (finish_X4),
+        .a      (five12_dt4),
         .b      (A4),
         .result (X4)
     );
     fp_multiplier mult_X5 (
         .clk    (clk),
-        .a      (twleve_dt5),  // 1/12·Δt⁵
+        .valid  (multX_valid),
+        .finish (finish_X5),
+        .a      (twleve_dt5),
         .b      (Theta_7_10),
         .result (X5)
     );
     fp_multiplier mult_X6 (
         .clk    (clk),
-        .a      (delta_t),     // can be Δt⁶ precomputed externally
+        .valid  (multX_valid),
+        .finish (finish_X6),
+        .a      (delta_t),     // Δt⁶ 建议外部预计算
         .b      (Theta_10_10),
         .result (X6)
     );
 
     // ------------------------------------------------------------------------
-    // 累加：
-    //  T1 = A1 + X1
-    //  T2 = X2 + X3
-    //  T3 = X4 + X5
-    //  T4 = T1 + X6
-    //  T5 = T2 + T3
+    // 累加：T1..T5
     // ------------------------------------------------------------------------
+    assign addT_valid = finish_X1 & finish_X2 & finish_X3 & finish_X4 & finish_X5 & finish_X6;
     fp_adder add_T1 (
         .clk    (clk),
+        .valid  (addT_valid),
+        .finish (finish_T1),
         .a      (A1),
         .b      (X1),
         .result (T1)
     );
     fp_adder add_T2 (
         .clk    (clk),
+        .valid  (addT_valid),
+        .finish (finish_T2),
         .a      (X2),
         .b      (X3),
         .result (T2)
     );
     fp_adder add_T3 (
         .clk    (clk),
+        .valid  (addT_valid),
+        .finish (finish_T3),
         .a      (X4),
         .b      (X5),
         .result (T3)
     );
     fp_adder add_T4 (
         .clk    (clk),
+        .valid  (addT_valid),
+        .finish (finish_T4),
         .a      (T1),
         .b      (X6),
         .result (T4)
     );
     fp_adder add_T5 (
         .clk    (clk),
+        .valid  (addT_valid),
+        .finish (finish_T5),
         .a      (T2),
         .b      (T3),
         .result (T5)
     );
+
+    // ------------------------------------------------------------------------
+    // 最终累加 a = T5 + T4
+    // ------------------------------------------------------------------------
+    assign final_valid = finish_T1 & finish_T2 & finish_T3 & finish_T4 & finish_T5;
     fp_adder final_add (
         .clk    (clk),
+        .valid  (final_valid),
+        .finish (finish_final),
         .a      (T5),
         .b      (T4),
         .result (a)
     );
 
-    // ------------------------------------------------------------------------
-    // 有效信号流水线
-    // ------------------------------------------------------------------------
-    // 假设在模块顶层已经声明：
-logic [DBL_WIDTH-1:0] stage1_M   [0:2];  // 对应 M1, M2, M3
-logic [DBL_WIDTH-1:0] stage2_A   [0:3];  // 对应 A1, A2, A3, A4
-logic [DBL_WIDTH-1:0] stage3_X   [0:5];  // 对应 X1…X6
-logic [DBL_WIDTH-1:0] stage4_T   [0:4];  // 对应 T1…T5
+
 
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        // 复位：清零所有阶段寄存器和 valid 管线
-        for (int i = 0; i < 3; i++) stage1_M[i]   <= '0;
-        for (int i = 0; i < 4; i++) stage2_A[i]   <= '0;
-        for (int i = 0; i < 6; i++) stage3_X[i]   <= '0;
-        for (int i = 0; i < 5; i++) stage4_T[i]   <= '0;
         valid_pipe <= '0;
     end else begin
-        // 同步各阶段计算结果
-        stage1_M[0] <= M1;
-        stage1_M[1] <= M2;
-        stage1_M[2] <= M3;
-
-        stage2_A[0] <= A1;
-        stage2_A[1] <= A2;
-        stage2_A[2] <= A3;
-        stage2_A[3] <= A4;
-
-        stage3_X[0] <= X1;
-        stage3_X[1] <= X2;
-        stage3_X[2] <= X3;
-        stage3_X[3] <= X4;
-        stage3_X[4] <= X5;
-        stage3_X[5] <= X6;
-
-        stage4_T[0] <= T1;
-        stage4_T[1] <= T2;
-        stage4_T[2] <= T3;
-        stage4_T[3] <= T4;
-        stage4_T[4] <= T5;
 
         // valid 管线：5 级延迟后输出
         valid_pipe <= { valid_pipe[4:0], 1'b1 };
@@ -261,9 +241,9 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 
 // 输出
-assign valid_out = valid_pipe[5];
+assign valid_out = valid_pipe[5]&finish_final;
 // 最终 a 也是第5级累加的结果，直接从 stage4_T[4] 输出或再做一次加法
-assign a = stage4_T[4];
+
 
 
 endmodule

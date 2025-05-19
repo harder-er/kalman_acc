@@ -1,37 +1,10 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 2025/05/09 16:02:54
-// Design Name: 
 // Module Name: CMU_PHi44
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
-
-`timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company:
-// Engineer:
-//
-// Create Date: 2025/05/09
-// Module Name: CMU_PHi44
-// Description: PHi44 通道的 CMU 计算，单级流水：
+// Description: PHi44 通道的 CMU 计算，一级流水计算  
 //              a = Θ10,10 + Q10,10
 // Dependencies: fp_adder
 //////////////////////////////////////////////////////////////////////////////////
-
 module CMU_PHi44 #(
     parameter DBL_WIDTH = 64
 )(
@@ -45,30 +18,33 @@ module CMU_PHi44 #(
     output logic                   valid_out
 );
 
-
     // 中间信号
     logic [DBL_WIDTH-1:0] sum;
-    logic                  valid_pipe;
+    // valid/finish 信号
+    logic add_valid, finish_sum;
+    // 流水有效信号管线（1 级流水）
+    logic valid_pipe;
 
-    // 浮点加法
+    // ----------------- Stage1: 加法 -----------------
+    assign add_valid = 1'b1;
     fp_adder U_add (
         .clk    (clk),
+        .valid  (add_valid),
+        .finish (finish_sum),
         .a      (Theta_10_10),
         .b      (Q_10_10),
         .result (sum)
     );
 
-    // 一级流水寄存与 valid 管线
+    // ----------------- 流水寄存与控制 -----------------
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            a          <= '0;
             valid_pipe <= 1'b0;
         end else begin
-            a          <= sum;
-            valid_pipe <= 1'b1;
+            valid_pipe <= finish_sum;
         end
     end
 
     assign valid_out = valid_pipe;
-
+    assign a = sum;
 endmodule

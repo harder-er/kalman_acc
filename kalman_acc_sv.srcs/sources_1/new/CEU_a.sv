@@ -1,27 +1,11 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 2025/03/13 09:09:14
-// Design Name: 
-// Module Name: CEU_a
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: ·Ö¼¶Á÷Ë®ÏßÊµÏÖ CEU_a ¼ÆËã
-// 
-// Dependencies: fp_adder, fp_multiplier
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
 module CEU_a #(
     parameter DBL_WIDTH = 64
 )(
     input  logic                   clk,
     input  logic                   rst_n,
-    // ¶¯Ì¬ÊäÈë
-//    input  logic [DBL_WIDTH-1:0]   Theta_1_1,
+    // åŠ¨æ€è¾“å…¥
+    input  logic [DBL_WIDTH-1:0]   Theta_1_1,
     input  logic [DBL_WIDTH-1:0]   Theta_4_1,
     input  logic [DBL_WIDTH-1:0]   Theta_7_1,
     input  logic [DBL_WIDTH-1:0]   Theta_4_4,
@@ -33,115 +17,109 @@ module CEU_a #(
     input  logic [DBL_WIDTH-1:0]   Theta_10_10,
     input  logic [DBL_WIDTH-1:0]   Q_1_1,
     input  logic [DBL_WIDTH-1:0]   R_1_1,
-    // ¹Ì¶¨²ÎÊı
-    input  logic [DBL_WIDTH-1:0]   delta_t2,
-    input  logic [DBL_WIDTH-1:0]   delta_t_sq,
-    input  logic [DBL_WIDTH-1:0]   delta_t_cu,
-    input  logic [DBL_WIDTH-1:0]   delta_t_qu,
-    input  logic [DBL_WIDTH-1:0]   delta_t_qi,
-    input  logic [DBL_WIDTH-1:0]   delta_t_sx,
-    // Êä³ö
+    // å›ºå®šå‚æ•°
+    input  logic [DBL_WIDTH-1:0]   dt_1,   // 2*Î”t
+    input  logic [DBL_WIDTH-1:0]   dt_2,   // Î”t^2
+    input  logic [DBL_WIDTH-1:0]   dt_3,   // (1/3)Î”t^3
+    input  logic [DBL_WIDTH-1:0]   dt_4,   // (1/12)Î”t^4
+    input  logic [DBL_WIDTH-1:0]   dt_5,   // (1/6)Î”t^5
+    input  logic [DBL_WIDTH-1:0]   dt_6,   // (1/36)Î”t^6
+    // è¾“å‡º
     output logic [DBL_WIDTH-1:0]   a_out,
     output logic                   valid_out
 );
 
-    // ----------------- Á÷Ë®Ïß¼Ä´æÆ÷¶¨Òå -----------------
-    logic [DBL_WIDTH-1:0] stage1_A1, stage1_M1;
-    logic [DBL_WIDTH-1:0] stage2_X1, stage2_A2, stage2_M3;
-    logic [DBL_WIDTH-1:0] stage3_X2, stage3_X3;
-    logic [DBL_WIDTH-1:0] stage4_temp, stage4_X4, stage4_X5;
-    logic [DBL_WIDTH-1:0] stage5_T1, stage5_T2;
-    logic [DBL_WIDTH-1:0] stage6_T3, stage6_X6, stage6_T4;
-    logic [DBL_WIDTH-1:0] stage7_T5, stage7_T6;
-    logic [3:0]           pipe_valid;
+    // å·²å®šä¹‰çš„æµæ°´å¯„å­˜ä¿¡å·
+    logic [DBL_WIDTH-1:0] stage1_A1, stage1_A4;
+    logic [DBL_WIDTH-1:0] stage2_M1, stage2_M2, stage2_M3;
+    logic [DBL_WIDTH-1:0] stage3_A2, stage3_A3;
+    logic [DBL_WIDTH-1:0] stage4_X1, stage4_X2, stage4_X3, stage4_X4, stage4_X5, stage4_X6;
+    logic [DBL_WIDTH-1:0] stage5_T1, stage5_T2, stage5_T3, stage5_T4;
+    logic [DBL_WIDTH-1:0] stage6_T5, stage6_T6;
+    logic [6:0]           pipe_valid;
 
-    // ÁÙÊ±Á¬Ïß£¨×éºÏÂß¼­µ½Á÷Ë®Ïß¼Ä´æÆ÷£©
-    wire [DBL_WIDTH-1:0] mul_M2;    // 3 * ¦¨7,7
-    wire [DBL_WIDTH-1:0] sum_QR;    // Q_1_1 + R_1_1
+    // valid/finish ä¿¡å·
+    logic add1_valid, finish_A1, finish_A4;
+    logic mul1_valid, finish_M1, finish_M2, finish_M3;
+    logic add2_valid, finish_A2, finish_A3;
+    logic mul2_valid, finish_X1, finish_X2, finish_X3, finish_X4, finish_X5, finish_X6;
+    logic add3_valid, finish_T1, finish_T2, finish_T3, finish_T4;
+    logic add4_valid, finish_T5, finish_T6;
+    logic final_valid, finish_out;
 
-    // ----------------- ¶¥²ã×ÓÄ£¿éÊµÀı»¯ -----------------
-    // Stage 1
-    fp_adder      U_add_A1   (.clk(clk), .a(Theta_7_1), .b(Theta_4_4), .result(stage1_A1));
-    fp_multiplier U_mul_M1   (.clk(clk), .a(64'h4008000000000000), .b(Theta_7_4), .result(stage1_M1)); // 3*¦¨7,4
+    // ---------------- Stage1: A1 = Î˜7_1+Î˜4_4, A4=Q_1_1+R_1_1 ----------------
+    assign add1_valid = 1'b1;
+    fp_adder U1_add_A1   (.clk(clk), .valid(add1_valid), .finish(finish_A1),
+                          .a(Theta_7_1), .b(Theta_4_4), .result(stage1_A1));
+    fp_adder U1_add_A4   (.clk(clk), .valid(add1_valid), .finish(finish_A4),
+                          .a(Q_1_1),     .b(R_1_1),     .result(stage1_A4));
 
-    // Stage 2
-    fp_multiplier U_mul_X1   (.clk(clk), .a(delta_t2), .b(Theta_4_1), .result(stage2_X1));
-    fp_adder      U_add_A2   (.clk(clk), .a(Theta_10_1), .b(stage1_M1), .result(stage2_A2));
-    fp_multiplier U_mul_M3   (.clk(clk), .a(64'h4010000000000000), .b(Theta_10_4), .result(stage2_M3)); // 4*¦¨10,4
+    // ---------------- Stage2: M1=3*Î˜7_4, M2=4*Î˜10_4, M3=3*Î˜7_7 ----------------
+    assign mul1_valid = finish_A1 & finish_A4;
+    fp_multiplier U2_mul_M1 (.clk(clk), .valid(mul1_valid), .finish(finish_M1),
+                             .a(64'h4008_0000_0000_0000), .b(Theta_7_4), .result(stage2_M1));
+    fp_multiplier U2_mul_M2 (.clk(clk), .valid(mul1_valid), .finish(finish_M2),
+                             .a(64'h4010_0000_0000_0000), .b(Theta_10_4),.result(stage2_M2));
+    fp_multiplier U2_mul_M3 (.clk(clk), .valid(mul1_valid), .finish(finish_M3),
+                             .a(64'h4008_0000_0000_0000), .b(Theta_7_7), .result(stage2_M3));
 
-    // Stage 3
-    fp_multiplier U_mul_X2   (.clk(clk), .a(delta_t_sq), .b(stage1_A1), .result(stage3_X2));
-    fp_multiplier U_mul_X3   (.clk(clk), .a(delta_t_cu), .b(stage2_A2), .result(stage3_X3));
+    // ---------------- Stage3: A2=Î˜10_1+M1, A3=M2+M3 ----------------
+    assign add2_valid = finish_M1 & finish_M2 & finish_M3;
+    fp_adder U3_add_A2 (.clk(clk), .valid(add2_valid), .finish(finish_A2),
+                       .a(Theta_10_1), .b(stage2_M1), .result(stage3_A2));
+    fp_adder U3_add_A3 (.clk(clk), .valid(add2_valid), .finish(finish_A3),
+                       .a(stage2_M2),   .b(stage2_M3), .result(stage3_A3));
 
-    // Stage 4
-    fp_multiplier U_mul_M2   (.clk(clk), .a(64'h4008000000000000), .b(Theta_7_7), .result(mul_M2));  // 3*¦¨7,7
-    fp_adder      U_add_A3   (.clk(clk), .a(stage2_M3), .b(mul_M2), .result(stage4_temp));
-    fp_multiplier U_mul_X4   (.clk(clk), .a(delta_t_qu), .b(stage4_temp), .result(stage4_X4));
-    fp_multiplier U_mul_X5   (.clk(clk), .a(delta_t_qi), .b(Theta_10_7), .result(stage4_X5));
+    // ---------------- Stage4: X1..X6 ----------------
+    assign mul2_valid = finish_A2 & finish_A3;
+    fp_multiplier U4_mul_X1 (.clk(clk), .valid(mul2_valid), .finish(finish_X1),
+                             .a(dt_1), .b(Theta_4_1),   .result(stage4_X1));
+    fp_multiplier U4_mul_X2 (.clk(clk), .valid(mul2_valid), .finish(finish_X2),
+                             .a(dt_2), .b(stage1_A1),   .result(stage4_X2));
+    fp_multiplier U4_mul_X3 (.clk(clk), .valid(mul2_valid), .finish(finish_X3),
+                             .a(dt_3), .b(stage3_A2),   .result(stage4_X3));
+    fp_multiplier U4_mul_X4 (.clk(clk), .valid(mul2_valid), .finish(finish_X4),
+                             .a(dt_4), .b(stage3_A3),   .result(stage4_X4));
+    fp_multiplier U4_mul_X5 (.clk(clk), .valid(mul2_valid), .finish(finish_X5),
+                             .a(dt_5), .b(Theta_10_7),  .result(stage4_X5));
+    fp_multiplier U4_mul_X6 (.clk(clk), .valid(mul2_valid), .finish(finish_X6),
+                             .a(dt_6), .b(Theta_10_10), .result(stage4_X6));
 
-    // Stage 5
-    fp_adder      U_add_T1   (.clk(clk), .a(Theta_1_1), .b(stage2_X1), .result(stage5_T1));
-    fp_adder      U_add_T2   (.clk(clk), .a(stage3_X2), .b(stage3_X3), .result(stage5_T2));
+    // ---------------- Stage5: T1=Î˜10_7+X1, T2=X2+X3 ----------------
+    assign add3_valid = finish_X1 & finish_X2 & finish_X3 & finish_X4 & finish_X5 & finish_X6;
+    fp_adder U5_add_T1 (.clk(clk), .valid(add3_valid), .finish(finish_T1),
+                       .a(Theta_10_7), .b(stage4_X1), .result(stage5_T1));
+    fp_adder U5_add_T2 (.clk(clk), .valid(add3_valid), .finish(finish_T2),
+                       .a(stage4_X2),   .b(stage4_X3), .result(stage5_T2));
 
-    // Stage 6
-    fp_adder      U_add_T3   (.clk(clk), .a(stage4_X4), .b(stage4_X5), .result(stage6_T3));
-    fp_multiplier U_mul_X6   (.clk(clk), .a(delta_t_sx), .b(Theta_10_10), .result(stage6_X6));
-    fp_adder      U_add_QR   (.clk(clk), .a(Q_1_1), .b(R_1_1), .result(sum_QR));
-    fp_adder      U_add_T4   (.clk(clk), .a(stage6_X6), .b(sum_QR), .result(stage6_T4));
+    // ---------------- Stage6: T3=X4+X5, T4=X6+A4 ----------------
+    assign add4_valid = finish_T2;
+    fp_adder U6_add_T3 (.clk(clk), .valid(add4_valid), .finish(finish_T3),
+                       .a(stage4_X4),  .b(stage4_X5), .result(stage5_T3));
+    fp_adder U6_add_T4 (.clk(clk), .valid(add4_valid), .finish(finish_T4),
+                       .a(stage4_X6),  .b(stage1_A4), .result(stage5_T4));
 
-    // Stage 7
-    fp_adder      U_add_T5   (.clk(clk), .a(stage5_T1), .b(stage5_T2), .result(stage7_T5));
-    fp_adder      U_add_T6   (.clk(clk), .a(stage6_T3), .b(stage6_T4), .result(stage7_T6));
-    fp_adder      U_final    (.clk(clk), .a(stage7_T5), .b(stage7_T6), .result(a_out));
+    // ---------------- Stage7: T5=T1+T2, T6=T3+T4 ----------------
+    assign final_valid = finish_T4;
+    fp_adder U7_add_T5  (.clk(clk), .valid(final_valid), .finish(finish_T5),
+                        .a(stage5_T1), .b(stage5_T2), .result(stage6_T5));
+    fp_adder U7_add_T6  (.clk(clk), .valid(final_valid ), .finish(finish_T6),
+                        .a(stage5_T3), .b(stage5_T4), .result(stage6_T6));
+    // æœ€ç»ˆè¾“å‡º
+    fp_adder U7_add_out (.clk(clk), .valid(final_valid & finish_T5 & finish_T6), .finish(finish_out),
+                        .a(stage6_T5), .b(stage6_T6), .result(a_out));
 
-    // ----------------- Á÷Ë®Ïß¼Ä´æÆ÷Óë¿ØÖÆ -----------------
+    // ---------------- Stage0: valid ç®¡çº¿ ----------------
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            stage1_A1   <= '0;
-            stage1_M1   <= '0;
-            stage2_X1   <= '0;
-            stage2_A2   <= '0;
-            stage2_M3   <= '0;
-            stage3_X2   <= '0;
-            stage3_X3   <= '0;
-            stage4_temp <= '0;
-            stage4_X4   <= '0;
-            stage4_X5   <= '0;
-            stage5_T1   <= '0;
-            stage5_T2   <= '0;
-            stage6_T3   <= '0;
-            stage6_X6   <= '0;
-            stage6_T4   <= '0;
-            stage7_T5   <= '0;
-            stage7_T6   <= '0;
-            pipe_valid  <= 4'b0000;
-        end else begin
-            // ¸÷¼¶¼ÆËã½á¹ûÒÑÓÉ×ÓÄ£¿éÔÚÍ¬Ò»Ê±ÖÓÑØ²úÉú£¬
-            // ÕâÀïÓÃÓÚÍ¬²½ÏÂÒ»¼¶Á÷Ë®
-            stage1_A1   <= stage1_A1;
-            stage1_M1   <= stage1_M1;
-            stage2_X1   <= stage2_X1;
-            stage2_A2   <= stage2_A2;
-            stage2_M3   <= stage2_M3;
-            stage3_X2   <= stage3_X2;
-            stage3_X3   <= stage3_X3;
-            stage4_temp <= stage4_temp;
-            stage4_X4   <= stage4_X4;
-            stage4_X5   <= stage4_X5;
-            stage5_T1   <= stage5_T1;
-            stage5_T2   <= stage5_T2;
-            stage6_T3   <= stage6_T3;
-            stage6_X6   <= stage6_X6;
-            stage6_T4   <= stage6_T4;
-            stage7_T5   <= stage7_T5;
-            stage7_T6   <= stage7_T6;
-
-            // ¹ÜÏßÓĞĞ§ĞÅºÅ×óÒÆ²¢×¢ÈëĞÂ"1"
-            pipe_valid <= {pipe_valid[2:0], 1'b1};
-        end
+        if (!rst_n)
+            pipe_valid <= 7'b0;
+        else
+            pipe_valid <= { pipe_valid[5:0], finish_out };
     end
 
-    // Êä³öÓĞĞ§ĞÅºÅ£ºµ±×î¸ßÎ»Îª 1 Ê±£¬a_out ÎªÓĞĞ§Êı¾İ
-    assign valid_out = pipe_valid[3];
+
+
+    // è¾“å‡ºæœ‰æ•ˆä¿¡å·ï¼šå½“æœ€é«˜ä½ä¸º 1 æ—¶ï¼Œa_out ä¸ºæœ‰æ•ˆæ•°æ®
+    assign valid_out = pipe_valid[6]&finish_out;
 
 endmodule

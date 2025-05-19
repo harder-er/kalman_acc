@@ -52,38 +52,43 @@ module KF_ControlUnit (
   
     always_ff @(posedge clk or negedge rst_sync) begin
         if (!rst_sync) begin
-            current_state <= INIT;  // 异步复位到初始状态
+            next_state <= INIT;  // 异步复位到初始状态
         end else begin
-            case (current_state)
+            case (current_state) 
                 // 初始化状态转移路径
                 INIT: begin
-                    current_state <= (Init_Valid) ? STATE_PREDICTION : INIT;
+                    if (Init_Valid) begin
+                        next_state <= STATE_PREDICTION;
+                    end else begin
+                        next_state <= INIT;  // 循环状态
+                    end
                 end
+                
                 
                 // 状态预测阶段转移逻辑
                 STATE_PREDICTION: begin
                     if (End_valid) 
-                        current_state <= END_STATE;
+                        next_state <= END_STATE;
                     else if (SP_Done) begin
-                        current_state <= CAL_KALMAN_GAIN;  
+                        next_state <= CAL_KALMAN_GAIN;  
                     end else 
-                        current_state <= STATE_PREDICTION;  // 循环状态
+                        next_state <= STATE_PREDICTION;  // 循环状态
                 end
                 
                 // 卡尔曼增益计算阶段
                 CAL_KALMAN_GAIN: begin
-                    if (CKG_Done) current_state <= STATE_COV_UPDATE;
-                    else current_state <= CAL_KALMAN_GAIN;  // 循环状态
+                    if (CKG_Done) next_state <= STATE_COV_UPDATE;
+                    else next_state <= CAL_KALMAN_GAIN;  // 循环状态
                 end 
                 
                 // 协方差更新阶段
                 STATE_COV_UPDATE: begin
                     if (SCU_Done_s && SCU_Done_p && MDI_Valid) begin
-                        current_state <= STATE_PREDICTION;
-                    end else current_state <= STATE_COV_UPDATE;  // 循环状态
+                        next_state <= STATE_PREDICTION;
+                    end else next_state <= STATE_COV_UPDATE;  // 循环状态
                 end
                 
-                default: current_state <= INIT;  // 容错处理
+                default: next_state <= INIT;  // 容错处理
             endcase
         end
     end

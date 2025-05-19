@@ -24,18 +24,25 @@
 module fp_suber(
     input  logic clk,
     input  logic [64-1:0] a, b,
+    input  logic valid,
+    output logic finish,
     output logic [64-1:0] result
 );
+    logic s_axis_a_tready;
+    logic s_axis_b_tready;
+    logic m_axis_result_tvalid;
+    floating_point_sub u_floating_point_sub(
+    .aclk                 ( clk                 ),
+    .s_axis_a_tvalid      ( valid      ),
+    .s_axis_a_tready      ( s_axis_a_tready      ),
+    .s_axis_a_tdata       ( a       ),
+    .s_axis_b_tvalid      ( valid      ),
+    .s_axis_b_tready      ( s_axis_b_tready      ),
+    .s_axis_b_tdata       ( b       ),
+    .m_axis_result_tvalid ( m_axis_result_tvalid ),
+    .m_axis_result_tready ( 1'b1 ),
+    .m_axis_result_tdata  ( result  )
+);
 
-    floating_point_sub u_float_point_sub(
-      .aclk(clk),
-      .s_axis_a_tvalid(a_tvalid),
-      .s_axis_a_tdata(a_tdata),
-      .s_axis_b_tvalid(b_tvalid),
-      .s_axis_b_tdata(b_tdata),
-      .s_axis_operation_tvalid(operation_tvalid),
-      .s_axis_operation_tdata(operation_tdata),
-      .m_axis_result_tvalid(result_tvalid),
-      .m_axis_result_tdata(result_tdata)
-    );
+assign finish = m_axis_result_tvalid & s_axis_a_tready & s_axis_b_tready;
 endmodule

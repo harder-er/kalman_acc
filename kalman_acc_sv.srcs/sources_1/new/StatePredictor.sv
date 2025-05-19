@@ -30,7 +30,7 @@ module StatePredictor #(
     output  logic             SP_DONE                       ,     // 状态预测完成信号   
     
     input   logic [VEC_WIDTH-1:0] X_kk1  [MAT_DIM-1:0]      ,     // 上一时刻状态估计
-    input   logic [VEC_WIDTH-1:0] K_k    [12-1:0][12-1:0]   ,     // Kalman增益
+    input   logic [VEC_WIDTH-1:0] K_k    [12-1:0][6-1:0]   ,     // Kalman增益
     input   logic [VEC_WIDTH-1:0] Z_k    [6-1:0]            ,     // 观测值
 
     output  logic [VEC_WIDTH-1:0] X_kk   [MAT_DIM-1:0]           // 下一时刻状态估计
@@ -75,7 +75,8 @@ endgenerate
 
 SystolicArray #(
     .DWIDTH(64),
-    .ARRAY_SIZE(3)
+    .N(12),
+    .LATENCY(12)
 ) u_systolic (
     .clk(clk),
     .rst_n(rst_n),

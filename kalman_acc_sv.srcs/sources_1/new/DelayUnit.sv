@@ -14,21 +14,20 @@
 
 module DelayUnit #(
     parameter integer DELAY_CYCLES = 1,
-    parameter integer ROWS         = 1,
-    parameter integer COLS         = 1,
-    parameter integer DATA_WIDTH   = 1
+    parameter integer ROWS         = 12,
+    parameter integer COLS         = 12,
+    parameter integer DATA_WIDTH   = 64
 )(
-    input  logic                                 clk,
-    input  logic                                 rst_n,
-    input  logic [DATA_WIDTH-1:0]                data_in  [0:ROWS-1][0:COLS-1],
-    output logic [DATA_WIDTH-1:0]                data_out [0:ROWS-1][0:COLS-1]
+    input  logic                   clk      ,
+    input  logic                   rst_n    ,
+    input  logic [DATA_WIDTH-1:0]  data_in  [0:ROWS-1][0:COLS-1],
+    // input  logic [DATA_WIDTH-1:0]  data_in  [ROWS-1:0] [COLS>1?COLS:1];
+    output logic [DATA_WIDTH-1:0]  data_out [0:ROWS-1][0:COLS-1]
 );
 
     // 如果不需要任何延迟，直接连线
     generate
         if (DELAY_CYCLES == 0) begin
-            // 直接映射
-            
             for (genvar r = 0; r < ROWS; r++) begin
                 for (genvar c = 0; c < COLS; c++) begin
                     assign data_out[r][c] = data_in[r][c];

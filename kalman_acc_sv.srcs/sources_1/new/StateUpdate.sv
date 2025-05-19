@@ -47,7 +47,8 @@ assign load_en = MDI_Valid & CKG_Done;
 logic [64-1:0] Xk1kmatrix [11:0][11:0];
 SystolicArray #(
     .DWIDTH(64),
-    .ARRAY_SIZE(3)
+    .N(12),
+    .LATENCY(12)
 ) u_systolic (
     .clk        ( clk               ),
     .rst_n      ( rst_n             ),

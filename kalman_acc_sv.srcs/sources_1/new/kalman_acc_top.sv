@@ -19,18 +19,18 @@ module KalmanFilterTop #(
 
 
     // 系统模型参数
-    input  logic [64:0]                  Q_k    [STATE_DIM-1:0][STATE_DIM-1:0]      ,
-    input  logic [64:0]                  R_k    [MEASURE_DIM-1:0][MEASURE_DIM-1:0]  ,
+    input  logic [64-1:0]                Q_k    [STATE_DIM-1:0][STATE_DIM-1:0]      ,
+    input  logic [64-1:0]                R_k    [MEASURE_DIM-1:0][MEASURE_DIM-1:0]  ,
 
     // 实时数据接口
-    input  logic [64:0]                  Z_k    [MEASURE_DIM-1:0]                   , // 观测值 
+    input  logic [64-1:0]                Z_k    [MEASURE_DIM-1:0]                   , // 观测值 
     input  logic                         En_MDI,
-    input  logic [64:0]                  X_00   [STATE_DIM-1:0]                     , // 初始状态      
-    input  logic [64:0]                  P_00   [STATE_DIM-1:0][STATE_DIM-1:0]      ,
+    input  logic [64-1:0]                X_00   [STATE_DIM-1:0]                     , // 初始状态      
+    input  logic [64-1:0]                P_00   [STATE_DIM-1:0][STATE_DIM-1:0]      ,
 
     // 滤波结果输出
-    output logic [31:0]                  X_kkout  [STATE_DIM-1:0]                   , // 估计状态
-    output logic [31:0]                  P_kkout  [STATE_DIM-1:0][STATE_DIM-1:0]    ,
+    output logic [63:0]                  X_kkout  [STATE_DIM-1:0]                   , // 估计状态
+    output logic [63:0]                  P_kkout  [STATE_DIM-1:0][STATE_DIM-1:0]    ,
 
     output logic                         filter_done
 
@@ -49,7 +49,7 @@ module KalmanFilterTop #(
     logic [63:0]                         P_kk         [STATE_DIM-1:0][STATE_DIM-1:0]; // P_k,k
     logic [63:0]                         P_k1k1       [STATE_DIM-1:0][STATE_DIM-1:0]; // P_k-1,k-1
     
-    logic [63:0]                         K_k      [STATE_DIM-1:0][STATE_DIM-1:0];
+    logic [63:0]                         K_k      [STATE_DIM-1:0][MEASURE_DIM-1:0];
 
     logic [63:0]                         F        [STATE_DIM-1:0][STATE_DIM-1:0]; // K_k
 
@@ -91,24 +91,25 @@ module KalmanFilterTop #(
 );
 
 
-    Fmake u_Fmake (
-        .clk        ( clk    ),
-        .rst_n      ( rst_n  ),
-        .deltat     ( deltat ),
-        .F          ( F      )
+    F_make u_Fmake (
+        .clk        ( clk       ),
+        .rst_n      ( rst_n     ),
+        .finish     ( F_finish  ),
+        .deltat     ( deltat    ),
+        .F          ( F         )
     );
     // -------------------------------------------------
     // 状态预测
     // -------------------------------------------------
     StateUpdate u_StateUpdator (
-        .clk            (clk        ),
-        .rst_n          (rst_n      ),
-        .F              (F          ),
-        .X_kk           (X_kk       ),
-        .X_k1k          (X_k1k      ),
-        .CKG_Done       (en_ckg     ),
-        .MDI_Valid      (en_mdi     ),
-        .SCU_Done       (SCU_Done_s ) 
+        .clk            ( clk        ),
+        .rst_n          ( rst_n      ),
+        .F              ( F          ),
+        .X_kk           ( X_kk       ),
+        .X_k1k          ( X_k1k      ),
+        .CKG_Done       ( en_ckg     ),
+        .MDI_Valid      ( en_mdi     ),
+        .SCU_Done       ( SCU_Done_s ) 
     );
 
 
@@ -150,32 +151,42 @@ module KalmanFilterTop #(
         .STATE_DIM(STATE_DIM),
         .DWIDTH   (64)
     ) u_CovUpdate (
-        .clk           (clk         ),
-        .rst_n         (rst_n       ),
-        .K_k           (K_k         ),
-        .R_k           (R_k         ),
-        .P_kk1         (P_kk1       ),
-        .P_kk          (P_kk        ),
-        .CKG_Done      (en_ckg      ),
-        .SCU_Done      (SCU_Done    ) 
+        .clk           ( clk         ),
+        .rst_n         ( rst_n       ),
+        .K_k           ( K_k         ),
+        .R_k           ( R_k         ),
+        .P_kk1         ( P_kk1       ),
+        .P_kk          ( P_kk        ),
+        .CKG_Done      ( en_ckg      ),
+        .SCU_Done      ( SCU_Done    ) 
     );
-
+    logic [64-1:0] Xk1k_delay [STATE_DIM-1:0][0:0];
+    logic [64-1:0] Xkk1_delay [STATE_DIM-1:0][0:0];
+generate
+    for (genvar i = 0; i < STATE_DIM; i++) begin : gen_Xk1k_delay
+        assign Xk1k_delay[i][0] = X_k1k[i];
+    end
+    for (genvar i = 0; i < STATE_DIM; i++) begin : gen_Xkk1_delay
+        assign X_kk1[i] = Xkk1_delay[i][0];
+    end
+    
+endgenerate
     DelayUnit #(
-        .DELAY_CYCLES(1),
-        .ROWS        (12),
-        .COLS        (12),
-        .DATA_WIDTH  (64)
-    ) u_DelayX (
-        .clk       ( clk    ),
-        .rst_n     ( rst_n  ),
-        .data_in   ( Xk1k   ),
-        .data_out  ( Xkk1   )
-    );
-
-    DelayUnit #(
-        .DELAY_CYCLES(1),
+        .DELAY_CYCLES(1 ),
         .ROWS        (12),
         .COLS        (1 ),
+        .DATA_WIDTH  (64)
+    ) u_DelayX (
+        .clk       ( clk          ),
+        .rst_n     ( rst_n        ),
+        .data_in   ( Xk1k_delay   ),
+        .data_out  ( Xkk1_delay   )
+    );
+
+    DelayUnit #(
+        .DELAY_CYCLES(1 ),
+        .ROWS        (12),
+        .COLS        (12),
         .DATA_WIDTH  (64)
     ) u_DelayP (
         .clk       ( clk        ),

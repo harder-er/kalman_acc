@@ -20,20 +20,31 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module fp_adder(
-    input  logic clk,
-    input  logic [64-1:0] a, b,
+    input  logic clk                ,
+    input  logic [64-1:0] a, b      ,
+    input  logic          valid     ,
+    output logic          finish    ,
     output logic [64-1:0] result
 );
+    logic s_axis_a_tready;
+    logic s_axis_b_tready;
+    logic m_axis_result_tvalid;
+    floating_point_add u_floating_point_add (
+		.aclk                   ( clk           		),             // 时钟
+		// A 通道   
+		.s_axis_a_tvalid        ( valid         		),        // 输入 A 有效
+		.s_axis_a_tready        ( s_axis_a_tready      	),        // 输入 A 就绪
+		.s_axis_a_tdata         ( a             		),         // 输入 A 数据
+		// B 通道   
+		.s_axis_b_tvalid        ( valid         		),        // 输入 B 有效
+		.s_axis_b_tready        ( s_axis_b_tready      	),        // 输入 B 就绪
+		.s_axis_b_tdata         ( b             		),         // 输入 B 数据
+		// 输出结果通道
+		.m_axis_result_tvalid   ( m_axis_result_tvalid  ),   // 结果有效
+		.m_axis_result_tready   ( 1'b1          		),   // 结果就绪
+		.m_axis_result_tdata    ( result         		)     // 结果数据
+	);
 
-    floating_point_add u_float_point_add(
-      .aclk(clk),
-      .s_axis_a_tvalid(a_tvalid),
-      .s_axis_a_tdata(a_tdata),
-      .s_axis_b_tvalid(b_tvalid),
-      .s_axis_b_tdata(b_tdata),
-      .s_axis_operation_tvalid(operation_tvalid),
-      .s_axis_operation_tdata(operation_tdata),
-      .m_axis_result_tvalid(result_tvalid),
-      .m_axis_result_tdata(result_tdata)
-    );
+    assign finish = m_axis_result_tvalid & s_axis_a_tready & s_axis_b_tready;
+
 endmodule

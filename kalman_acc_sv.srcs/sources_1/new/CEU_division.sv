@@ -53,24 +53,37 @@ module CEU_division #(
     logic                     div_dout_tready  = 1'b1;
 
     // --- 顶层实例化 Floating-Point Divider IP ---
-    floating_point_div u_floating_point_div (
-        .aclk                    (clk),
-        // 分子输入
-        .s_axis_dividend_tdata   (numerator),
-        .s_axis_dividend_tvalid  (div_dividend_tvalid),
-        .s_axis_dividend_tready  (div_dividend_tready),
-        // 分母输入
-        .s_axis_divisor_tdata    (denominator),
-        .s_axis_divisor_tvalid   (div_divisor_tvalid),
-        .s_axis_divisor_tready   (div_divisor_tready),
-        // 商输出
-        .m_axis_dout_tdata       (quotient),
-        .m_axis_dout_tvalid      (div_dout_tvalid),
-        .m_axis_dout_tready      (div_dout_tready)
+    // floating_point_div u_floating_point_div (
+    //     .aclk                    (clk),
+    //     // 分子输入
+    //     .s_axis_dividend_tdata   (numerator),
+    //     .s_axis_dividend_tvalid  (div_dividend_tvalid),
+    //     .s_axis_dividend_tready  (div_dividend_tready),
+    //     // 分母输入
+    //     .s_axis_divisor_tdata    (denominator),
+    //     .s_axis_divisor_tvalid   (div_divisor_tvalid),
+    //     .s_axis_divisor_tready   (div_divisor_tready),
+    //     // 商输出
+    //     .m_axis_dout_tdata       (quotient),
+    //     .m_axis_dout_tvalid      (div_dout_tvalid),
+    //     .m_axis_dout_tready      (div_dout_tready)
+    // );
+
+    floating_point_div u_floating_point_div(
+        .aclk                 ( clk),
+        .s_axis_a_tdata       ( numerator),
+        .s_axis_a_tvalid      ( div_dividend_tvalid),
+        .s_axis_a_tready      ( div_dividend_tready),
+
+        .s_axis_b_tdata       ( denominator),
+        .s_axis_b_tvalid      ( div_divisor_tvalid),
+        .s_axis_b_tready      ( div_divisor_tready),
+        
+        .m_axis_result_tdata  ( quotient),
+        .m_axis_result_tvalid ( div_dout_tvalid),
+        .m_axis_result_tready ( div_dout_tready)
     );
-    // Note: 该 IP 核会在内部按流水线级数延迟后，将 quotient 输出并将
-    // m_axis_dout_tvalid 拉高，指示数据有效。你可以用一个小寄存器
-    // 队列或 handshake 信号进一步同步。
+
 
 endmodule
 

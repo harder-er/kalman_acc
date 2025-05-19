@@ -20,51 +20,44 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module Fmake (
+module F_make (
     input          clk,      // 时钟信号
     input          rst_n,    // 异步复位（低有效）
+    output          finish,   // 完成信号
     input  [63:0]  deltat,   // 时间步长Δt（双精度浮点）
     output reg [63:0] F [0:11][0:11] // 12x12双精度浮点矩阵
 );
 
 // 浮点运算IP核声明
-wire [63:0] deltat_sq, deltat_cu, deltat_sq_div2, deltat_cu_div6, deltat_sq_div6;
+    wire [63:0] deltat_sq, deltat_cu, deltat_sq_div2, deltat_cu_div6, deltat_sq_div6;
+
+    logic dt2_finish, dt3_finish;
+
+    fp_multiplier u_fp_mult_dt2 (
+        .clk(clk),
+        .a(deltat),
+        .b(deltat),
+        .valid(1'b1),
+        .finish(dt2_finish),
+        .result(deltat_sq)
+    );
+
+    fp_multiplier u_fp_mult_dt3 (
+        .clk(clk),
+        .valid(dt2_finish),
+        .finish(dt3_finish),
+        .a(deltat_sq),
+        .b(deltat),
+        .result(deltat_cu)
+    );
 
 
-fp_multiplier u_fp_mult_dt2 (
-  .a(deltat),
-  .b(deltat),
-  .result(deltat_sq)
-);
-// 实例化浮点乘法器（Xilinx示例命名）
-// floating_point_mult mult_dt2 (
-//   .aclk(clk),
-//   .s_axis_a_tvalid(1'b1),
-//   .s_axis_a_tdata(deltat),
-//   .s_axis_b_tvalid(1'b1),
-//   .s_axis_b_tdata(deltat),
-//   .m_axis_result_tdata(deltat_sq)
-// );
-fp_multiplier u_fp_mult_dt3 (
-  .a(deltat_sq),
-  .b(deltat),
-  .result(deltat_cu)
-);
-// floating_point_mult mult_dt3 (
-//   .aclk(clk),
-//   .s_axis_a_tvalid(1'b1),
-//   .s_axis_a_tdata(deltat_sq),
-//   .s_axis_b_tvalid(1'b1),
-//   .s_axis_b_tdata(deltat),
-//   .m_axis_result_tdata(deltat_cu)
-// );
-
-    logic                     div_dividend_tvalid = 1'b1;
-    logic                     div_divisor_tvalid  = 1'b1;
+    logic                     div_dividend_tvalid = dt3_finish;
+    logic                     div_divisor_tvalid  = dt3_finish;
     logic                     div_dividend_tready;
     logic                     div_divisor_tready;
     logic                     div_dout_tvalid;
-    logic                     div_dout_tready  = 1'b1;
+    logic                     div_dout_tready  = dt3_finish;
 
     // --- 顶层实例化 Floating-Point Divider IP ---
 
@@ -86,65 +79,45 @@ fp_multiplier u_fp_mult_dt3 (
         .m_axis_result_tdata    (deltat_sq_div2)    // 结果数据 (64位)
     );
     
-// 浮点除法IP核（配置为双精度）
-// floating_point_div div_2 (
-//   .aclk(clk),
-//   .s_axis_a_tvalid(1'b1),
-//   .s_axis_a_tdata(deltat_sq),
-//   .s_axis_b_tvalid(1'b1),
-//   .s_axis_b_tdata(64'h4000000000000000), // 浮点数2.0
-//   .m_axis_result_tdata(deltat_sq_div2)
-// );
+
 
     floating_point_div u_floating_point_div6 (
-        .aclk                    ( clk                   ),
-        // 分子输入 
-        .s_axis_dividend_tdata   ( deltat_cu             ),
-        .s_axis_dividend_tvalid  ( div_dividend_tvalid   ),
-        .s_axis_dividend_tready  ( div_dividend_tready   ),
-        // 分母输入 
-        .s_axis_divisor_tdata    ( 64'h4018000000000000  ),
-        .s_axis_divisor_tvalid   ( div_divisor_tvalid    ),
-        .s_axis_divisor_tready   ( div_divisor_tready    ),
-        // 商输出 
-        .m_axis_dout_tdata       ( deltat_cu_div6        ),
-        .m_axis_dout_tvalid      ( div_dout_tvalid       ),
-        .m_axis_dout_tready      ( div_dout_tready       )
+        .aclk                   (clk),                        // 时钟信号
+        // 被除数输入 (A 通道)
+        .s_axis_a_tvalid        (div_dividend_tvalid),        // 被除数有效信号
+        .s_axis_a_tready        (div_dividend_tready),        // 被除数就绪信号
+        .s_axis_a_tdata         (deltat_cu),                  // 被除数数据 (64位)
+        // 除数输入 (B 通道)
+        .s_axis_b_tvalid        (div_divisor_tvalid),         // 除数有效信号
+        .s_axis_b_tready        (div_divisor_tready),         // 除数就绪信号
+        .s_axis_b_tdata         (64'h4018000000000000),       // 除数数据 (64位)
+        // 结果输出
+        .m_axis_result_tvalid   (div_dout_tvalid),            // 结果有效信号
+        .m_axis_result_tready   (div_dout_tready),            // 结果就绪信号
+        .m_axis_result_tdata    (deltat_cu_div6)              // 结果数据 (64位)
     );
 
-// floating_point_div div_6 (
-//   .aclk(clk),
-//   .s_axis_a_tvalid(1'b1),
-//   .s_axis_a_tdata(deltat_cu),
-//   .s_axis_b_tvalid(1'b1),
-//   .s_axis_b_tdata(64'h4018000000000000), // 浮点数6.0
-//   .m_axis_result_tdata(deltat_cu_div6)
-// );
+
+
 
     floating_point_div u_floating_point_divsq6 (
-        .aclk                    ( clk                   ),
-        // 分子输入 
-        .s_axis_dividend_tdata   ( deltat_sq             ),
-        .s_axis_dividend_tvalid  ( div_dividend_tvalid   ),
-        .s_axis_dividend_tready  ( div_dividend_tready   ),
-        // 分母输入 
-        .s_axis_divisor_tdata    ( 64'h4018000000000000  ),
-        .s_axis_divisor_tvalid   ( div_divisor_tvalid    ),
-        .s_axis_divisor_tready   ( div_divisor_tready    ),
-        // 商输出 
-        .m_axis_dout_tdata       ( deltat_sq_div6        ),
-        .m_axis_dout_tvalid      ( div_dout_tvalid       ),
-        .m_axis_dout_tready      ( div_dout_tready       )
+        .aclk                   (clk),                        // 时钟信号
+        // 被除数输入 (A 通道)
+        .s_axis_a_tvalid        (div_dividend_tvalid),        // 被除数有效信号
+        .s_axis_a_tready        (div_dividend_tready),        // 被除数就绪信号
+        .s_axis_a_tdata         (deltat_sq),                  // 被除数数据 (64位)
+        // 除数输入 (B 通道)
+        .s_axis_b_tvalid        (div_divisor_tvalid),         // 除数有效信号
+        .s_axis_b_tready        (div_divisor_tready),         // 除数就绪信号
+        .s_axis_b_tdata         (64'h4018000000000000),       // 除数数据 (64位)
+        // 结果输出
+        .m_axis_result_tvalid   (div_dout_tvalid),            // 结果有效信号
+        .m_axis_result_tready   (div_dout_tready),            // 结果就绪信号
+        .m_axis_result_tdata    (deltat_sq_div6)              // 结果数据 (64位)
     );
 
-// floating_point_div div_sq6 (
-//   .aclk(clk),
-//   .s_axis_a_tvalid(1'b1),
-//   .s_axis_a_tdata(deltat_sq),
-//   .s_axis_b_tvalid(1'b1),
-//   .s_axis_b_tdata(64'h4018000000000000), // 6.0
-//   .m_axis_result_tdata(deltat_sq_div6)
-// );
+
+assign finish = div_dividend_tvalid & div_divisor_tvalid & div_dout_tvalid;
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
